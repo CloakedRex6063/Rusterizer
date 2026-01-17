@@ -1,18 +1,16 @@
+use crate::ImageView;
 use sdl3::pixels::PixelFormat;
 use sdl3::render::{BlendMode, Canvas, TextureCreator};
 use sdl3::video::WindowContext;
-use crate::{ImageView};
 
-struct Texture
-{
+struct Texture {
     pixels: Vec<u8>,
     texture: sdl3::render::Texture<'static>,
     width: u32,
     height: u32,
 }
 
-pub struct Window
-{
+pub struct Window {
     context: sdl3::Sdl,
     video: sdl3::VideoSubsystem,
     event_pump: sdl3::EventPump,
@@ -25,13 +23,16 @@ pub struct Window
     resized: bool,
 }
 
-impl Window
-{
+impl Window {
     pub fn new() -> Self {
-        let context =  sdl3::init().unwrap();
+        let context = sdl3::init().unwrap();
         let video = context.video().unwrap();
         let event_pump = context.event_pump().unwrap();
-        let window = video.window("Rusterizer", 1280, 720).resizable().build().unwrap();
+        let window = video
+            .window("Rusterizer", 1280, 720)
+            .resizable()
+            .build()
+            .unwrap();
         let canvas = window.into_canvas();
         let texture_creator: &'static _ = Box::leak(Box::new(canvas.texture_creator()));
 
@@ -47,7 +48,7 @@ impl Window
             height: 720,
         };
 
-        Self{
+        Self {
             context,
             video,
             event_pump,
@@ -65,23 +66,19 @@ impl Window
         self.running
     }
 
-    pub fn get_mouse_pos(&self) -> (i32, i32)
-    {
+    pub fn get_mouse_pos(&self) -> (i32, i32) {
         self.mouse_pos
     }
 
-    pub fn get_window_size(&self) -> (i32, i32)
-    {
+    pub fn get_window_size(&self) -> (i32, i32) {
         self.window_size
     }
 
-    pub fn is_resized(&self) -> bool
-    {
+    pub fn is_resized(&self) -> bool {
         self.resized
     }
 
-    pub fn present(&mut self, image_view: &ImageView)
-    {
+    pub fn present(&mut self, image_view: &ImageView) {
         let src = unsafe {
             std::slice::from_raw_parts(
                 image_view.get_pixels().as_ptr() as *const u8,
@@ -91,22 +88,28 @@ impl Window
         self.texture.pixels.copy_from_slice(src);
 
         let pitch = (self.window_size.0 * 4) as usize;
-        self.texture.texture.update(None, &self.texture.pixels, pitch).unwrap();
+        self.texture
+            .texture
+            .update(None, &self.texture.pixels, pitch)
+            .unwrap();
         self.canvas.copy(&self.texture.texture, None, None).unwrap();
         self.canvas.present();
         self.resized = false;
     }
 
-    pub fn poll(&mut self)
-    {
+    pub fn poll(&mut self) {
         for event in self.event_pump.poll_iter() {
             use sdl3::event::Event;
-            match event{
-                Event::Quit { .. } => { self.running = false }
-                Event::Window { win_event: sdl3::event::WindowEvent::Resized(width, height), .. } => {
+            match event {
+                Event::Quit { .. } => self.running = false,
+                Event::Window {
+                    win_event: sdl3::event::WindowEvent::Resized(width, height),
+                    ..
+                } => {
                     self.window_size = (width, height);
 
-                    let mut texture_data = self.texture_creator
+                    let mut texture_data = self
+                        .texture_creator
                         .create_texture_streaming(PixelFormat::RGBA32, width as u32, height as u32)
                         .unwrap();
                     texture_data.set_blend_mode(BlendMode::None);
@@ -122,11 +125,7 @@ impl Window
                 }
                 Event::KeyDown { .. } => {}
                 Event::KeyUp { .. } => {}
-                Event::MouseMotion {
-                    x,
-                    y,
-                    ..
-                } => {
+                Event::MouseMotion { x, y, .. } => {
                     self.mouse_pos = (x as i32, y as i32);
                 }
                 _ => {}
