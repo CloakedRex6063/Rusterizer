@@ -22,6 +22,7 @@ pub struct Window
     window_size: (i32, i32),
     mouse_pos: (i32, i32),
     running: bool,
+    resized: bool,
 }
 
 impl Window
@@ -55,7 +56,8 @@ impl Window
             texture,
             window_size: (1280, 720),
             mouse_pos: (0, 0),
-            running: true
+            running: true,
+            resized: false,
         }
     }
 
@@ -73,6 +75,11 @@ impl Window
         self.window_size
     }
 
+    pub fn is_resized(&self) -> bool
+    {
+        self.resized
+    }
+
     pub fn present(&mut self, image_view: &ImageView)
     {
         let src = unsafe {
@@ -81,12 +88,13 @@ impl Window
                 image_view.get_pixels().len() * 4,
             )
         };
-        self.texture.pixels[..src.len()].copy_from_slice(src);
+        self.texture.pixels.copy_from_slice(src);
 
         let pitch = (self.window_size.0 * 4) as usize;
         self.texture.texture.update(None, &self.texture.pixels, pitch).unwrap();
         self.canvas.copy(&self.texture.texture, None, None).unwrap();
         self.canvas.present();
+        self.resized = false;
     }
 
     pub fn poll(&mut self)
@@ -96,8 +104,21 @@ impl Window
             match event{
                 Event::Quit { .. } => { self.running = false }
                 Event::Window { win_event: sdl3::event::WindowEvent::Resized(width, height), .. } => {
-                    //TODO: Resize Texture
                     self.window_size = (width, height);
+
+                    let mut texture_data = self.texture_creator
+                        .create_texture_streaming(PixelFormat::RGBA32, width as u32, height as u32)
+                        .unwrap();
+                    texture_data.set_blend_mode(BlendMode::None);
+
+                    self.texture = Texture {
+                        pixels: vec![0; (width * height * 4) as usize],
+                        texture: texture_data,
+                        width: width as u32,
+                        height: height as u32,
+                    };
+
+                    self.resized = true;
                 }
                 Event::KeyDown { .. } => {}
                 Event::KeyUp { .. } => {}
