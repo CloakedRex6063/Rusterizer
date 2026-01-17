@@ -1,6 +1,6 @@
 use std::cmp::PartialEq;
 use std::time::Instant;
-use crate::math::{Float3, Float4, Color};
+use crate::math::{Float3, Float4, Color, Matrix4};
 use crate::window::Window;
 
 mod window;
@@ -45,13 +45,13 @@ impl Command
         image.clear_image(color);
     }
 
-    fn draw_mesh(&mut self, image: &mut ImageView, mesh: &Mesh)
+    fn draw_mesh(&mut self, image: &mut ImageView, mesh: &Mesh, transform: Matrix4)
     {
         let mut vertex_index: u32 = 0;
         while vertex_index + 2 < mesh.positions.len() as u32 {
-            let v0 = mesh.positions[vertex_index as usize].as_point();
-            let mut v1 = mesh.positions[vertex_index as usize + 1].as_point();
-            let mut v2 = mesh.positions[vertex_index as usize + 2].as_point();
+            let v0 = transform * mesh.positions[vertex_index as usize].as_point();
+            let mut v1 = transform * mesh.positions[vertex_index as usize + 1].as_point();
+            let mut v2 = transform * mesh.positions[vertex_index as usize + 2].as_point();
 
             if self.cull_mode == CullMode::CounterClockwise
             {
@@ -167,9 +167,9 @@ fn main() {
     let mut command = Command::new();
 
     let positions = vec![
-        Float3::new(300.0, 600.0, 0.0),
-        Float3::new(450.0, 400.0, 0.0),
-        Float3::new(600.0, 600.0, 0.0),
+        Float3::new(0.0, 75.0, 0.0),
+        Float3::new(50.0, 0.0, 0.0),
+        Float3::new(100.0, 75.0, 0.0),
     ];
     let mesh = Mesh
     {
@@ -189,11 +189,20 @@ fn main() {
         command.set_cull_mode(CullMode::Clockwise);
 
         profile!("Clear Time", {
-            command.clear_image(&mut image_view, Float4::new(0.0, 0.0, 0.0, 0.0));
+            command.clear_image(&mut image_view, Float4::new(0.0, 0.0, 0.0, 1.0));
         });
 
         profile!("Mesh Render Time", {
-            command.draw_mesh(&mut image_view, &mesh);
+            let (mx, my) = window.get_mouse_pos();
+
+            let mut transform = Matrix4::identity();
+            for i in 0..50
+            {
+                transform.data[3] = mx as f32 + 100.0 * (i % 10) as f32;
+                transform.data[7] = my as f32 + 100.0 * (i / 10) as f32;
+                command.draw_mesh(&mut image_view, &mesh, transform);
+            }
+
         });
 
         profile!("Present Time", {

@@ -34,9 +34,11 @@ impl Window
         let canvas = window.into_canvas();
         let texture_creator: &'static _ = Box::leak(Box::new(canvas.texture_creator()));
 
-        let texture_data = texture_creator
+        let mut texture_data = texture_creator
             .create_texture_streaming(PixelFormat::RGBA32, 1280, 720)
             .unwrap();
+        texture_data.set_blend_mode(BlendMode::None);
+
         let texture = Texture {
             pixels: vec![0; 1280 * 720 * 4],
             texture: texture_data,

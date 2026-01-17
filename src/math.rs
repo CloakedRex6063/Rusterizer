@@ -221,3 +221,55 @@ impl From<Color> for Float4 {
         }
     }
 }
+
+#[derive(Clone, Copy, Default)]
+pub struct Matrix4
+{
+    pub data: [f32; 16],
+}
+
+impl Matrix4
+{
+    pub fn new() -> Self {
+        Self{
+            data: [0.0; 16],
+        }
+    }
+
+    pub fn identity() -> Self {
+        Self{
+            data: [
+                1.0, 0.0, 0.0, 0.0,
+                0.0, 1.0, 0.0, 0.0,
+                0.0, 0.0, 1.0, 0.0,
+                0.0, 0.0, 0.0, 1.0,
+            ]
+        }
+    }
+}
+
+impl ops::Mul<Float4> for Matrix4
+{
+    type Output = Float4;
+    fn mul(self, rhs: Float4) -> Float4 {
+        Float4::new(
+            self.data[0]  * rhs.x + self.data[1]  * rhs.y + self.data[2]  * rhs.z + self.data[3]  * rhs.w,
+            self.data[4]  * rhs.x + self.data[5]  * rhs.y + self.data[6]  * rhs.z + self.data[7]  * rhs.w,
+            self.data[8]  * rhs.x + self.data[9]  * rhs.y + self.data[10] * rhs.z + self.data[11] * rhs.w,
+            self.data[12] * rhs.x + self.data[13] * rhs.y + self.data[14] * rhs.z + self.data[15] * rhs.w,
+        )
+    }
+}
+
+impl ops::Mul<Matrix4> for Float4 {
+    type Output = Float4;
+
+    fn mul(self, rhs: Matrix4) -> Float4 {
+        Float4::new(
+            self.x * rhs.data[0]  + self.y * rhs.data[4]  + self.z * rhs.data[8]  + self.w * rhs.data[12],
+            self.x * rhs.data[1]  + self.y * rhs.data[5]  + self.z * rhs.data[9]  + self.w * rhs.data[13],
+            self.x * rhs.data[2]  + self.y * rhs.data[6]  + self.z * rhs.data[10] + self.w * rhs.data[14],
+            self.x * rhs.data[3]  + self.y * rhs.data[7]  + self.z * rhs.data[11] + self.w * rhs.data[15],
+        )
+    }
+}
