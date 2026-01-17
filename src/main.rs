@@ -26,6 +26,7 @@ enum CullMode {
 
 struct Mesh {
     positions: Vec<Float3>,
+    indices: Vec<u32>,
     colors: Vec<Float4>,
 }
 
@@ -48,16 +49,19 @@ fn main() {
     let mut command = Command::new();
 
     let positions = vec![
-        Float3::new(0.0, 0.5, 0.0),
-        Float3::new(0.5, -0.5, 0.0),
         Float3::new(-0.5, -0.5, 0.0),
+        Float3::new(-0.5, 0.5, 0.0),
+        Float3::new(0.5, -0.5, 0.0),
+        Float3::new(0.5, 0.5, 0.0),
     ];
     let colors = vec![
-        Float4::new(1.0, 0.0, 0.0, 0.0),
-        Float4::new(0.0, 1.0, 0.0, 0.0),
-        Float4::new(0.0, 0.0, 1.0, 0.0),
+        Float4::new(1.0, 0.0, 0.0, 1.0),
+        Float4::new(0.0, 1.0, 0.0, 1.0),
+        Float4::new(0.0, 0.0, 1.0, 1.0),
+        Float4::new(1.0, 1.0, 1.0, 1.0),
     ];
-    let mesh = Mesh { positions, colors };
+    let indices = vec![0, 1, 2, 2, 1, 3];
+    let mesh = Mesh { positions, colors, indices };
 
     let mut last_time = Instant::now();
     while window.is_running() {
@@ -80,7 +84,7 @@ fn main() {
         };
         command.set_viewport(viewport);
 
-        command.set_cull_mode(CullMode::CounterClockwise);
+        command.set_cull_mode(CullMode::None);
 
         profile!("Clear Time", {
             command.clear_image(&mut image_view, Float4::new(1.0, 1.0, 1.0, 1.0));

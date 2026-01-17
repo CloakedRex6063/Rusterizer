@@ -33,13 +33,22 @@ impl Command {
     }
 
     pub fn draw_mesh(&mut self, image: &mut ImageView, mesh: &Mesh, transform: Matrix4) {
-        for vertex_index in (0usize..mesh.positions.len())
-            .step_by(3)
-            .take_while(|&i| i + 2 < mesh.positions.len())
+        for vertex_index in (0..mesh.indices.len() - 2).step_by(3)
         {
-            let mut v0 = transform * mesh.positions[vertex_index].as_point();
-            let mut v1 = transform * mesh.positions[vertex_index + 1].as_point();
-            let mut v2 = transform * mesh.positions[vertex_index + 2].as_point();
+            let mut i0 = vertex_index as u32;
+            let mut i1 = vertex_index as u32 + 1;
+            let mut i2 = vertex_index as u32 + 2;
+
+            if !mesh.indices.is_empty()
+            {
+                i0 = mesh.indices[i0 as usize];
+                i1 = mesh.indices[i1 as usize];
+                i2 = mesh.indices[i2 as usize];
+            }
+
+            let mut v0 = transform * mesh.positions[i0 as usize].as_point();
+            let mut v1 = transform * mesh.positions[i1 as usize].as_point();
+            let mut v2 = transform * mesh.positions[i2 as usize].as_point();
 
             v0 = self.viewport.to_screen_space(v0);
             v1 = self.viewport.to_screen_space(v1);
@@ -48,13 +57,13 @@ impl Command {
             let mut det012 = math::det2d(v1 - v0, v2 - v0);
             let ccw = det012 < 0.0;
 
-            let c0 = mesh.colors[vertex_index + 0];
-            let mut c1 = mesh.colors[vertex_index + 1];
-            let mut c2 = mesh.colors[vertex_index + 2];
+            let c0 = mesh.colors[i0 as usize];
+            let mut c1 = mesh.colors[i1 as usize];
+            let mut c2 = mesh.colors[i2 as usize];
 
             match self.cull_mode {
                 CullMode::None => {
-                    if !ccw {
+                    if ccw {
                         std::mem::swap(&mut v1, &mut v2);
                         std::mem::swap(&mut c1, &mut c2);
                         det012 = -det012;
@@ -101,9 +110,9 @@ impl Command {
                     let det20p = math::det2d(v0 - v2, p - v2);
 
                     if det01p >= 0.0 && det12p >= 0.0 && det20p >= 0.0 {
-                        let l0 = det01p / det012;
-                        let l1 = det12p / det012;
-                        let l2 = det20p / det012;
+                        let l0 = math::det2d(v1 - p, v2 - p) / det012;
+                        let l1 = math::det2d(v2 - p, v0 - p) / det012;
+                        let l2 = math::det2d(v0 - p, v1 - p) / det012;
                         image.set_pixel(
                             x as u32,
                             y as u32,
