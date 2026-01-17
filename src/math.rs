@@ -273,3 +273,24 @@ impl ops::Mul<Matrix4> for Float4 {
         )
     }
 }
+
+
+impl ops::Mul<Float4> for f32 {
+    type Output = Float4;
+
+    fn mul(self, rhs: Float4) -> Float4 {
+        Float4::new(
+            self * rhs.x, self * rhs.y, self * rhs.z, self * rhs.w
+        )
+    }
+}
+
+impl ops::Mul<f32> for Float4 {
+    type Output = Float4;
+
+    fn mul(self, rhs: f32) -> Float4 {
+        Float4::new(
+            self.x * rhs, self.y * rhs, self.z * rhs, self.w * rhs
+        )
+    }
+}

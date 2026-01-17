@@ -53,6 +53,10 @@ impl Command
             let mut v1 = transform * mesh.positions[vertex_index as usize + 1].as_point();
             let mut v2 = transform * mesh.positions[vertex_index as usize + 2].as_point();
 
+            let c0 = mesh.colors[vertex_index as usize + 0];
+            let c1 = mesh.colors[vertex_index as usize + 1];
+            let c2 = mesh.colors[vertex_index as usize + 2];
+
             if self.cull_mode == CullMode::CounterClockwise
             {
                 std::mem::swap(&mut v1, &mut v2);
@@ -93,12 +97,40 @@ impl Command
             for x in xmin..xmax {
                 for y in ymin..ymax {
                     let p = Float4::new(x as f32 + 0.5, y as f32 + 0.5, 0.0, 0.0);
-                    let e0 = math::det2d(v1 - v0, p - v0);
-                    let e1 = math::det2d(v2 - v1, p - v1);
-                    let e2 = math::det2d(v0 - v2, p - v2);
+                    let det01p = math::det2d(v1 - v0, p - v0);
+                    let det12p = math::det2d(v2 - v1, p - v1);
+                    let det20p = math::det2d(v0 - v2, p - v2);
 
-                    if e0 >= 0.0 && e1 >= 0.0 && e2 >= 0.0 {
-                        image.set_pixel(x as u32, y as u32, Color::from(mesh.color));
+                    let mut det012 = math::det2d(v2 - v0, v1 - v0);
+                    let ccw = det012 < 0.0;
+
+                    match self.cull_mode {
+                        CullMode::None => {
+                            if ccw
+                            {
+                                det012 = -det012;
+                            }
+                        }
+                        CullMode::CounterClockwise => {
+                            if ccw
+                            {
+                                continue
+                            };
+                        }
+                        CullMode::Clockwise => {
+                            if !ccw
+                            {
+                                continue
+                            };
+                            det012 = -det012;
+                        }
+                    }
+
+                    if det01p >= 0.0 && det12p >= 0.0 && det20p >= 0.0 {
+                        let l0 = det01p / det012;
+                        let l1 = det12p / det012;
+                        let l2 = det20p / det012;
+                        image.set_pixel(x as u32, y as u32, Color::from(l0 * c0 + l1 * c1 + l2 * c2));
                     }
                 }
             }
@@ -144,7 +176,7 @@ impl ImageView
 struct Mesh
 {
     positions: Vec<Float3>,
-    color: Float4,
+    colors: Vec<Float4>,
 }
 
 #[macro_export]
@@ -171,10 +203,15 @@ fn main() {
         Float3::new(50.0, 0.0, 0.0),
         Float3::new(100.0, 75.0, 0.0),
     ];
+    let colors = vec![
+        Float4::new(1.0, 0.0, 0.0, 0.0),
+        Float4::new(0.0, 1.0, 0.0, 0.0),
+        Float4::new(0.0, 0.0, 1.0, 0.0),
+    ];
     let mesh = Mesh
     {
         positions,
-        color: Float4::new(1.0, 0.0, 0.0, 1.0),
+        colors
     };
     
     let mut last_time = Instant::now();
