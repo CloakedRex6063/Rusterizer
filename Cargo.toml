@@ -1,0 +1,11 @@
+[package]
+name = "Rusterizer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies.sdl3]
+version = "0.17.3"
+features = ["static-link", "build-from-source"]
+[dependencies.num-traits]
+version = "0.2.19"
+

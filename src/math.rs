@@ -1,0 +1,223 @@
+use std::ops;
+use num_traits::{Zero, One};
+
+pub trait Number: Copy + Zero + One {}
+
+impl Number for f32 {}
+impl Number for f64 {}
+impl Number for i32 {}
+impl Number for i64 {}
+impl Number for u32 {}
+impl Number for u64 {}
+
+#[derive(Default, Copy, Clone, Debug)]
+pub struct Vec2<T: Number>
+{
+    pub x: T,
+    pub y: T,
+}
+impl<T: Number> Vec2<T>
+{
+    pub const fn new(x: T, y: T) -> Self {
+        Self { x, y }
+    }
+}
+
+pub type UInt2 = Vec2<u32>;
+pub type Int2 = Vec2<i32>;
+pub type Float2 = Vec2<f32>;
+
+
+impl<T: Number + ops::Add<Output = T>> ops::Add<Vec2<T>> for Vec2<T>
+{
+    type Output = Vec2<T>;
+    fn add(self, _rhs: Vec2<T>) -> Vec2<T>
+    {
+        Vec2{x: self.x + _rhs.x, y: self.y + _rhs.y}
+    }
+}
+
+impl<T: Number + ops::Sub<Output = T>> ops::Sub<Vec2<T>> for Vec2<T>
+{
+    type Output = Vec2<T>;
+    fn sub(self, _rhs: Vec2<T>) -> Vec2<T>
+    {
+        Vec2{x: self.x - _rhs.x, y: self.y - _rhs.y}
+    }
+}
+
+impl<T: Number + ops::Mul<Output = T>> ops::Mul<Vec2<T>> for Vec2<T>
+{
+    type Output = Vec2<T>;
+    fn mul(self, _rhs: Vec2<T>) -> Vec2<T>
+    {
+        Vec2{x: self.x * _rhs.x, y: self.y * _rhs.y}
+    }
+}
+
+impl<T: Number + ops::Div<Output = T>> ops::Div<Vec2<T>> for Vec2<T>
+{
+    type Output = Vec2<T>;
+    fn div(self, _rhs: Vec2<T>) -> Vec2<T>
+    {
+        Vec2{x: self.x / _rhs.x, y: self.y / _rhs.y}
+    }
+}
+
+
+#[derive(Default, Copy, Clone, Debug)]
+pub struct Vec3<T: Number>
+{
+    pub x: T,
+    pub y: T,
+    pub z: T,
+}
+
+impl <T: Number> Vec3<T>
+{
+    pub const fn new(x: T, y: T, z: T) -> Self {
+        Self { x, y, z }
+    }
+
+    pub fn as_point(&self) -> Vec4<T>
+    {
+        Vec4{x: self.x, y: self.y, z: self.z, w: T::one()}
+    }
+
+    pub fn as_vector(&self) -> Vec4<T>
+    {
+        Vec4{x: self.x, y: self.y, z: self.z, w: T::zero()}
+    }
+}
+
+pub type UInt3 = Vec3<u32>;
+pub type Int3 = Vec3<i32>;
+pub type Float3 = Vec3<f32>;
+
+impl<T: Number + ops::Add<Output = T>> ops::Add<Vec3<T>> for Vec3<T>
+{
+    type Output = Vec3<T>;
+    fn add(self, _rhs: Vec3<T>) -> Vec3<T>
+    {
+        Vec3{x: self.x + _rhs.x, y: self.y + _rhs.y, z: self.z + _rhs.z}
+    }
+}
+
+impl<T: Number + ops::Sub<Output = T>> ops::Sub<Vec3<T>> for Vec3<T>
+{
+    type Output = Vec3<T>;
+    fn sub(self, _rhs: Vec3<T>) -> Vec3<T>
+    {
+        Vec3{x: self.x - _rhs.x, y: self.y - _rhs.y, z: self.z - _rhs.z}
+    }
+}
+
+impl<T: Number + ops::Mul<Output = T>> ops::Mul<Vec3<T>> for Vec3<T>
+{
+    type Output = Vec3<T>;
+    fn mul(self, _rhs: Vec3<T>) -> Vec3<T>
+    {
+        Vec3{x: self.x * _rhs.x, y: self.y * _rhs.y, z: self.z * _rhs.z}
+    }
+}
+
+impl<T: Number + ops::Div<Output = T>> ops::Div<Vec3<T>> for Vec3<T>
+{
+    type Output = Vec3<T>;
+    fn div(self, _rhs: Vec3<T>) -> Vec3<T>
+    {
+        Vec3{x: self.x / _rhs.x, y: self.y / _rhs.y, z: self.z / _rhs.z}
+    }
+}
+
+
+#[derive(Default, Copy, Clone, Debug)]
+pub struct Vec4<T: Number>
+{
+    pub x: T,
+    pub y: T,
+    pub z: T,
+    pub w: T
+}
+impl <T: Number> Vec4<T>
+{
+    pub const fn new(x: T, y: T, z: T, w: T) -> Self {
+        Self { x, y, z, w }
+    }
+}
+
+pub type UInt4 = Vec4<u32>;
+pub type Int4 = Vec4<i32>;
+pub type Float4 = Vec4<f32>;
+
+impl<T: Number + ops::Add<Output = T>> ops::Add<Vec4<T>> for Vec4<T>
+{
+    type Output = Vec4<T>;
+    fn add(self, _rhs: Vec4<T>) -> Vec4<T>
+    {
+        Vec4{x: self.x + _rhs.x, y: self.y + _rhs.y, z: self.z + _rhs.z, w: self.w + _rhs.w}
+    }
+}
+
+impl<T: Number + ops::Sub<Output = T>> ops::Sub<Vec4<T>> for Vec4<T>
+{
+    type Output = Vec4<T>;
+    fn sub(self, _rhs: Vec4<T>) -> Vec4<T>
+    {
+        Vec4{x: self.x - _rhs.x, y: self.y - _rhs.y, z: self.z - _rhs.z, w: self.w - _rhs.w}
+    }
+}
+
+impl<T: Number + ops::Mul<Output = T>> ops::Mul<Vec4<T>> for Vec4<T>
+{
+    type Output = Vec4<T>;
+    fn mul(self, _rhs: Vec4<T>) -> Vec4<T>
+    {
+        Vec4{x: self.x * _rhs.x, y: self.y * _rhs.y, z: self.z * _rhs.z, w: self.w * _rhs.w}
+    }
+}
+
+impl<T: Number + ops::Div<Output = T>> ops::Div<Vec4<T>> for Vec4<T>
+{
+    type Output = Vec4<T>;
+    fn div(self, _rhs: Vec4<T>) -> Vec4<T>
+    {
+        Vec4{x: self.x / _rhs.x, y: self.y / _rhs.y, z: self.z / _rhs.z, w: self.w / _rhs.w}
+    }
+}
+
+pub fn det2d(v0: Float4, v1: Float4) -> f32
+{
+    v0.x * v1.y - v0.y * v1.x
+}
+
+#[derive(Clone, Copy, Default)]
+#[repr(transparent)]
+pub struct Color
+{
+    color: [u8; 4],
+}
+
+impl From<Float4> for Color {
+    fn from(c: Float4) -> Self {
+        Self {
+            color: [
+                (c.x * 255.0).clamp(0.0, 255.0) as u8,
+                (c.y * 255.0).clamp(0.0, 255.0) as u8,
+                (c.z * 255.0).clamp(0.0, 255.0) as u8,
+                (c.w * 255.0).clamp(0.0, 255.0) as u8,
+            ],
+        }
+    }
+}
+
+impl From<Color> for Float4 {
+    fn from(c: Color) -> Self {
+        Self {
+            x: c.color[0] as f32 / 255.0,
+            y: c.color[1] as f32 / 255.0,
+            z: c.color[2] as f32 / 255.0,
+            w: c.color[3] as f32 / 255.0,
+        }
+    }
+}
