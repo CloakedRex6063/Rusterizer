@@ -19,6 +19,14 @@ impl<T: Number> Vec2<T> {
     pub const fn new(x: T, y: T) -> Self {
         Self { x, y }
     }
+
+    pub fn zero() -> Self {
+        Self::new(T::zero(), T::zero())
+    }
+
+    pub fn dot(self, _rhs: Vec4<T>) -> T {
+        self.x * _rhs.x + self.y * _rhs.y
+    }
 }
 
 pub type UInt2 = Vec2<u32>;
@@ -75,6 +83,14 @@ pub struct Vec3<T: Number> {
 impl<T: Number> Vec3<T> {
     pub const fn new(x: T, y: T, z: T) -> Self {
         Self { x, y, z }
+    }
+
+    pub fn zero() -> Self {
+        Self::new(T::zero(), T::zero(), T::zero())
+    }
+
+    pub fn dot(self, _rhs: Vec3<T>) -> T {
+        self.x * _rhs.x + self.y * _rhs.y + self.z * _rhs.z
     }
 
     pub fn as_point(&self) -> Vec4<T> {
@@ -155,6 +171,21 @@ impl<T: Number> Vec4<T> {
     pub const fn new(x: T, y: T, z: T, w: T) -> Self {
         Self { x, y, z, w }
     }
+
+    pub fn zero() -> Self {
+        Self::new(T::zero(), T::zero(), T::zero(), T::zero())
+    }
+
+    pub fn dot(self, _rhs: Vec4<T>) -> T {
+        self.x * _rhs.x + self.y * _rhs.y + self.z * _rhs.z + self.w * _rhs.w
+    }
+}
+
+impl Float4
+{
+    pub fn det2d(self, v1: Float4) -> f32 {
+        self.x * v1.y - self.y * v1.x
+    }
 }
 
 pub type UInt4 = Vec4<u32>;
@@ -208,11 +239,6 @@ impl<T: Number + ops::Div<Output = T>> ops::Div<Vec4<T>> for Vec4<T> {
         }
     }
 }
-
-pub fn det2d(v0: Float4, v1: Float4) -> f32 {
-    v0.x * v1.y - v0.y * v1.x
-}
-
 #[derive(Clone, Copy, Default)]
 #[repr(transparent)]
 pub struct Color {

@@ -160,13 +160,12 @@ fn main() {
         });
 
         profile!("Mesh Render Time", {
-            let transform =
-                    Matrix4::perspective(0.01, 10.0, std::f32::consts::PI / 3.0, width as f32 * 1.0 / height as f32)
-                    * Matrix4::translate(Float3::new(0.0, 0.0, -5.0))
-                    * Matrix4::scale(Float3::new(height as f32 * 1.0 / width as f32, 1.0, 1.0))
-                    * Matrix4::scale_f(0.5)
+            let model = Matrix4::translate(Float3::new(0.0, 0.0, -5.0))
                     * Matrix4::rotate_zx(time)
                     * Matrix4::rotate_xy(time);
+            let transform =
+                    Matrix4::perspective(0.01, 10.0, std::f32::consts::PI / 3.0, width as f32 * 1.0 / height as f32)
+                    * model;
             command.draw_mesh(&mut image_view, &mesh, transform);
         });
 
