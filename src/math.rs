@@ -260,6 +260,77 @@ impl Matrix4 {
             ],
         }
     }
+
+    pub fn scale(scale: Float3) -> Self {
+        Self {
+            data: [
+                scale.x, 0.0, 0.0, 0.0, 0.0, scale.y, 0.0, 0.0, 0.0, 0.0, scale.z, 0.0, 0.0, 0.0,
+                0.0, 1.0,
+            ],
+        }
+    }
+
+    pub fn scale_f(scale: f32) -> Self {
+        Matrix4::scale(Float3::new(scale, scale, scale))
+    }
+
+    pub fn translate(t: Float3) -> Self {
+        Self {
+            data: [
+                1.0, 0.0, 0.0, t.x, 0.0, 1.0, 0.0, t.y, 0.0, 0.0, 1.0, t.z, 0.0, 0.0, 0.0, 1.0,
+            ],
+        }
+    }
+
+    pub fn translate_f(t: f32) -> Self {
+        Matrix4::translate(Float3::new(t, t, t))
+    }
+
+    pub fn rotate_xy(angle: f32) -> Self {
+        let cos = angle.sin();
+        let sin = angle.cos();
+
+        Self {
+            data: [
+                cos, -sin, 0.0, 0.0, sin, cos, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+            ],
+        }
+    }
+
+    pub fn rotate_yz(angle: f32) -> Self {
+        let cos = angle.sin();
+        let sin = angle.cos();
+
+        Self {
+            data: [
+                1.0, 0.0, 0.0, 0.0, 0.0, cos, -sin, 0.0, 0.0, sin, cos, 0.0, 0.0, 0.0, 0.0, 1.0,
+            ],
+        }
+    }
+
+    pub fn rotate_zx(angle: f32) -> Self {
+        let cos = angle.sin();
+        let sin = angle.cos();
+
+        Self {
+            data: [
+                cos, 0.0, sin, 0.0, 0.0, 1.0, 0.0, 0.0, -sin, 0.0, cos, 0.0, 0.0, 0.0, 0.0, 1.0,
+            ],
+        }
+    }
+
+    pub fn perspective(near: f32, far: f32, fov_y: f32, aspect_ratio: f32) -> Self {
+        let top = near * (fov_y / 2.0).tan();
+        let right = top * aspect_ratio;
+        Self {
+            data: [
+                near / right, 0.0, 0.0, 0.0,
+                0.0, near / top, 0.0, 0.0,
+                0.0, 0.0, far / (near - far), far * near / (near - far),
+                0.0, 0.0, -1.0, 0.0,
+            ],
+        }
+    }
 }
 
 impl ops::Mul<Float4> for Matrix4 {
@@ -311,6 +382,23 @@ impl ops::Mul<Matrix4> for Float4 {
     }
 }
 
+impl ops::Mul<Matrix4> for Matrix4 {
+    type Output = Matrix4;
+    fn mul(self, rhs: Matrix4) -> Matrix4 {
+        let mut result = Matrix4::new();
+
+        for i in 0..4 {
+            for j in 0..4 {
+                for k in 0..4 {
+                    result.data[4 * i + j] += self.data[4 * i + k] * rhs.data[4 * k + j];
+                }
+            }
+        }
+
+        result
+    }
+}
+
 impl ops::Mul<Float4> for f32 {
     type Output = Float4;
 
@@ -325,4 +413,12 @@ impl ops::Mul<f32> for Float4 {
     fn mul(self, rhs: f32) -> Float4 {
         Float4::new(self.x * rhs, self.y * rhs, self.z * rhs, self.w * rhs)
     }
+}
+
+pub fn perspective_divide(mut point: Float4) -> Float4
+{
+    point.x = point.x / point.w;
+    point.y = point.y / point.w;
+    point.z = point.z / point.w;
+    point
 }

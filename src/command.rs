@@ -33,14 +33,12 @@ impl Command {
     }
 
     pub fn draw_mesh(&mut self, image: &mut ImageView, mesh: &Mesh, transform: Matrix4) {
-        for vertex_index in (0..mesh.indices.len() - 2).step_by(3)
-        {
+        for vertex_index in (0..mesh.indices.len() - 2).step_by(3) {
             let mut i0 = vertex_index as u32;
             let mut i1 = vertex_index as u32 + 1;
             let mut i2 = vertex_index as u32 + 2;
 
-            if !mesh.indices.is_empty()
-            {
+            if !mesh.indices.is_empty() {
                 i0 = mesh.indices[i0 as usize];
                 i1 = mesh.indices[i1 as usize];
                 i2 = mesh.indices[i2 as usize];
@@ -49,6 +47,10 @@ impl Command {
             let mut v0 = transform * mesh.positions[i0 as usize].as_point();
             let mut v1 = transform * mesh.positions[i1 as usize].as_point();
             let mut v2 = transform * mesh.positions[i2 as usize].as_point();
+
+            v0 = math::perspective_divide(v0);
+            v1 = math::perspective_divide(v1);
+            v2 = math::perspective_divide(v2);
 
             v0 = self.viewport.to_screen_space(v0);
             v1 = self.viewport.to_screen_space(v1);

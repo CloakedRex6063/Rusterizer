@@ -49,27 +49,96 @@ fn main() {
     let mut command = Command::new();
 
     let positions = vec![
-        Float3::new(-0.5, -0.5, 0.0),
-        Float3::new(-0.5, 0.5, 0.0),
-        Float3::new(0.5, -0.5, 0.0),
-        Float3::new(0.5, 0.5, 0.0),
+        // -X face
+        Float3::new(-1.0, -1.0, -1.0),
+        Float3::new(-1.0, 1.0, -1.0),
+        Float3::new(-1.0, -1.0, 1.0),
+        Float3::new(-1.0, 1.0, 1.0),
+        // +X face
+        Float3::new(1.0, -1.0, -1.0),
+        Float3::new(1.0, 1.0, -1.0),
+        Float3::new(1.0, -1.0, 1.0),
+        Float3::new(1.0, 1.0, 1.0),
+        // -Y face
+        Float3::new(-1.0, -1.0, -1.0),
+        Float3::new(1.0, -1.0, -1.0),
+        Float3::new(-1.0, -1.0, 1.0),
+        Float3::new(1.0, -1.0, 1.0),
+        // +Y face
+        Float3::new(-1.0, 1.0, -1.0),
+        Float3::new(1.0, 1.0, -1.0),
+        Float3::new(-1.0, 1.0, 1.0),
+        Float3::new(1.0, 1.0, 1.0),
+        // -Z face
+        Float3::new(-1.0, -1.0, -1.0),
+        Float3::new(1.0, -1.0, -1.0),
+        Float3::new(-1.0, 1.0, -1.0),
+        Float3::new(1.0, 1.0, -1.0),
+        // +Z face
+        Float3::new(-1.0, -1.0, 1.0),
+        Float3::new(1.0, -1.0, 1.0),
+        Float3::new(-1.0, 1.0, 1.0),
+        Float3::new(1.0, 1.0, 1.0),
     ];
+
     let colors = vec![
+        // -X face
+        Float4::new(0.0, 1.0, 1.0, 1.0),
+        Float4::new(0.0, 1.0, 1.0, 1.0),
+        Float4::new(0.0, 1.0, 1.0, 1.0),
+        Float4::new(0.0, 1.0, 1.0, 1.0),
+        // +X face
         Float4::new(1.0, 0.0, 0.0, 1.0),
+        Float4::new(1.0, 0.0, 0.0, 1.0),
+        Float4::new(1.0, 0.0, 0.0, 1.0),
+        Float4::new(1.0, 0.0, 0.0, 1.0),
+        // -Y face
+        Float4::new(1.0, 0.0, 1.0, 1.0),
+        Float4::new(1.0, 0.0, 1.0, 1.0),
+        Float4::new(1.0, 0.0, 1.0, 1.0),
+        Float4::new(1.0, 0.0, 1.0, 1.0),
+        // +Y face
         Float4::new(0.0, 1.0, 0.0, 1.0),
+        Float4::new(0.0, 1.0, 0.0, 1.0),
+        Float4::new(0.0, 1.0, 0.0, 1.0),
+        Float4::new(0.0, 1.0, 0.0, 1.0),
+        // -Z face
+        Float4::new(1.0, 1.0, 0.0, 1.0),
+        Float4::new(1.0, 1.0, 0.0, 1.0),
+        Float4::new(1.0, 1.0, 0.0, 1.0),
+        Float4::new(1.0, 1.0, 0.0, 1.0),
+        // +Z face
         Float4::new(0.0, 0.0, 1.0, 1.0),
-        Float4::new(1.0, 1.0, 1.0, 1.0),
+        Float4::new(0.0, 0.0, 1.0, 1.0),
+        Float4::new(0.0, 0.0, 1.0, 1.0),
+        Float4::new(0.0, 0.0, 1.0, 1.0),
     ];
-    let indices = vec![0, 1, 2, 2, 1, 3];
-    let mesh = Mesh { positions, colors, indices };
+
+    let indices: Vec<u32> = vec![
+        // -X face
+        0, 2, 1, 1, 2, 3, // +X face
+        4, 5, 6, 6, 5, 7, // -Y face
+        8, 9, 10, 10, 9, 11, // +Y face
+        12, 14, 13, 14, 15, 13, // -Z face
+        16, 18, 17, 17, 18, 19, // +Z face
+        20, 21, 22, 21, 23, 22,
+    ];
+
+    let mesh = Mesh {
+        positions,
+        colors,
+        indices,
+    };
 
     let mut last_time = Instant::now();
+    let mut time: f32 = 0.0;
     while window.is_running() {
         window.poll();
 
         let dt = last_time.elapsed().as_secs_f32();
         last_time = Instant::now();
         std::println!("Delta time: {dt}");
+        time += dt;
 
         let (width, height) = window.get_window_size();
         if window.is_resized() {
@@ -84,14 +153,21 @@ fn main() {
         };
         command.set_viewport(viewport);
 
-        command.set_cull_mode(CullMode::None);
+        command.set_cull_mode(CullMode::Clockwise);
 
         profile!("Clear Time", {
             command.clear_image(&mut image_view, Float4::new(1.0, 1.0, 1.0, 1.0));
         });
 
         profile!("Mesh Render Time", {
-            command.draw_mesh(&mut image_view, &mesh, Matrix4::identity());
+            let transform =
+                    Matrix4::perspective(0.01, 10.0, std::f32::consts::PI / 3.0, width as f32 * 1.0 / height as f32)
+                    * Matrix4::translate(Float3::new(0.0, 0.0, -5.0))
+                    * Matrix4::scale(Float3::new(height as f32 * 1.0 / width as f32, 1.0, 1.0))
+                    * Matrix4::scale_f(0.5)
+                    * Matrix4::rotate_zx(time)
+                    * Matrix4::rotate_xy(time);
+            command.draw_mesh(&mut image_view, &mesh, transform);
         });
 
         profile!("Present Time", {
