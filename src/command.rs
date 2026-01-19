@@ -1,10 +1,19 @@
 use crate::math::{Color, Float4, Matrix4};
 use crate::viewport::Viewport;
-use crate::{CullMode, ImageView, Mesh, math};
+use crate::{CullMode, math};
+use crate::image_view::{DepthBuffer, DepthTest, RenderTarget};
+use crate::meshes::Mesh;
+
+struct DepthState
+{
+    write: bool,
+    test: DepthTest,
+}
 
 pub struct Command {
     cull_mode: CullMode,
     viewport: Viewport,
+    depth_state: DepthState,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -24,7 +33,21 @@ impl Command {
                 x_max: 0,
                 y_max: 0,
             },
+            depth_state: DepthState {
+                write: false,
+                test: DepthTest::Less
+            },
         }
+    }
+
+    pub fn set_depth_test(&mut self, depth_test: DepthTest)
+    {
+        self.depth_state.test = depth_test;
+    }
+
+    pub fn toggle_depth_write(&mut self, write: bool)
+    {
+        self.depth_state.write = write;
     }
 
     pub fn set_cull_mode(&mut self, cull_mode: CullMode) {
@@ -35,113 +58,15 @@ impl Command {
         self.viewport = viewport;
     }
 
-    pub fn clear_image(&mut self, image: &mut ImageView, color: Float4) {
+    pub fn clear_render_target(&mut self, image: &mut RenderTarget, color: Float4) {
         image.clear_image(color);
     }
 
-    fn clip_intersect_edge(v0: Vertex, v1: Vertex, val0: f32, val1: f32) -> Vertex {
-        let t = val0 / (val0 - val1);
-        Vertex{
-            position: (1.0 - t) * v0.position + t * v1.position,
-            color: (1.0 - t) * v0.color + t * v1.color,
-        }
+    pub fn clear_depth_buffer(&mut self, image: &mut DepthBuffer, value: u32) {
+        image.clear_image(value);
     }
 
-    fn clip_triangle_against_plane(vertices: &[Vertex], equation: Float4, clipped: &mut Vec<Vertex>) {
-        let values = [
-            vertices[0].position.dot(equation),
-            vertices[1].position.dot(equation),
-            vertices[2].position.dot(equation),
-        ];
-
-        let mask: u8 =
-            (values[0] < 0.0) as u8
-                | ((values[1] < 0.0) as u8) << 1
-                | ((values[2] < 0.0) as u8) << 2;
-
-        match mask {
-            0b000 => {
-                clipped.push(vertices[0]);
-                clipped.push(vertices[1]);
-                clipped.push(vertices[2]);
-            }
-            0b001 => {
-                let v01 = Self::clip_intersect_edge(vertices[0], vertices[1], values[0], values[1]);
-                let v02 = Self::clip_intersect_edge(vertices[0], vertices[2], values[0], values[2]);
-                clipped.push(v01);
-                clipped.push(vertices[1]);
-                clipped.push(vertices[2]);
-                clipped.push(v01);
-                clipped.push(vertices[2]);
-                clipped.push(v02);
-            }
-            0b010 => {
-                let v10 = Self::clip_intersect_edge(vertices[1], vertices[0], values[1], values[0]);
-                let v12 = Self::clip_intersect_edge(vertices[1], vertices[2], values[1], values[2]);
-                clipped.push(vertices[0]);
-                clipped.push(v10);
-                clipped.push(vertices[2]);
-                clipped.push(vertices[2]);
-                clipped.push(v10);
-                clipped.push(v12);
-            }
-            0b011 => {
-                let v02 = Self::clip_intersect_edge(vertices[0], vertices[2], values[0], values[2]);
-                let v12 = Self::clip_intersect_edge(vertices[1], vertices[2], values[1], values[2]);
-                clipped.push(v02);
-                clipped.push(v12);
-                clipped.push(vertices[2]);
-            }
-            0b100 => {
-                let v20 = Self::clip_intersect_edge(vertices[2], vertices[0], values[2], values[0]);
-                let v21 = Self::clip_intersect_edge(vertices[2], vertices[1], values[2], values[1]);
-                clipped.push(vertices[0]);
-                clipped.push(vertices[1]);
-                clipped.push(v20);
-                clipped.push(v20);
-                clipped.push(vertices[1]);
-                clipped.push(v21);
-            }
-            0b101 => {
-                let v01 = Self::clip_intersect_edge(vertices[0], vertices[1], values[0], values[1]);
-                let v21 = Self::clip_intersect_edge(vertices[2], vertices[1], values[2], values[1]);
-                clipped.push(v01);
-                clipped.push(vertices[1]);
-                clipped.push(v21);
-            }
-            0b110 => {
-                let v10 = Self::clip_intersect_edge(vertices[1], vertices[0], values[1], values[0]);
-                let v20 = Self::clip_intersect_edge(vertices[2], vertices[0], values[2], values[0]);
-                clipped.push(vertices[0]);
-                clipped.push(v10);
-                clipped.push(v20);
-            }
-            0b111 => {
-
-            }
-            _ => {},
-        }
-    }
-
-    fn clip_vertices(vertices: [Vertex; 3]) -> Vec<Vertex> {
-        let mut input: Vec<Vertex> = vertices.to_vec();
-        let equations: [Float4; 2] = [
-            Float4::new(0.0, 0.0, 1.0, 0.0),
-            Float4::new(0.0, 0.0, -1.0, 1.0),
-        ];
-
-        for equation in equations.into_iter() {
-            let mut output = Vec::new();
-            for triangle in input.chunks_exact(3) {
-                Self::clip_triangle_against_plane(triangle, equation, &mut output);
-            }
-            input = output;
-        }
-
-        input
-    }
-
-    pub fn draw_mesh(&mut self, image: &mut ImageView, mesh: &Mesh, transform: Matrix4) {
+    pub fn draw_mesh(&mut self, render_target: &mut RenderTarget, mut depth_buffer: Option<&mut DepthBuffer>, mesh: &Mesh, transform: Matrix4) {
         for vertex_index in (0..mesh.indices.len() - 2).step_by(3) {
             let mut i0 = vertex_index as u32;
             let mut i1 = vertex_index as u32 + 1;
@@ -161,7 +86,7 @@ impl Command {
             vertices[1].color = mesh.colors[i1 as usize];
             vertices[2].color = mesh.colors[i2 as usize];
 
-            let clipped_vertices = Command::clip_vertices(vertices);
+            let clipped_vertices = clip_vertices(vertices);
 
             for triangle in clipped_vertices.chunks_exact(3)  {
                 let mut v0 = triangle[0].position;
@@ -207,9 +132,9 @@ impl Command {
                 }
 
                 let mut xmin: i32 = self.viewport.x_min.max(0);
-                let mut xmax: i32 = self.viewport.x_max.min(image.width as i32) - 1;
+                let mut xmax: i32 = self.viewport.x_max.min(render_target.width as i32) - 1;
                 let mut ymin: i32 = self.viewport.y_min.max(0);
-                let mut ymax: i32 = self.viewport.y_max.min(image.height as i32) - 1;
+                let mut ymax: i32 = self.viewport.y_max.min(render_target.height as i32) - 1;
 
                 let tri_x_min = v0.x.floor().min(v1.x.floor()).min(v2.x.floor()) as i32;
 
@@ -231,6 +156,7 @@ impl Command {
                         let det12p = (v2 - v1).det2d(p - v1);
                         let det20p = (v0 - v2).det2d(p - v2);
 
+
                         if det01p >= 0.0 && det12p >= 0.0 && det20p >= 0.0 {
                             let mut l0 = (v1 - p).det2d(v2 - p) / det012 / v0.w;
                             let mut l1 = (v2 - p).det2d(v0 - p) / det012 / v1.w;
@@ -243,16 +169,143 @@ impl Command {
                             l2 /= lsum;
 
                             let color = Color::from(l0 * c0 + l1 * c1 + l2 * c2);
-                            image.set_pixel(
-                                x as u32,
-                                y as u32,
-                                color,
-                            );
+
+                            if let Some(depth_buffer) = depth_buffer.as_mut() {
+                                let old_depth = depth_buffer.get_pixel(x as u32, y as u32);
+
+                                let z = l0 * v0.z + l1 * v1.z + l2 * v2.z;
+                                let depth = (z * u32::MAX as f32) as u32;
+
+                                if passed_depth_test(self.depth_state.test, depth, old_depth) {
+                                    if self.depth_state.write {
+                                        depth_buffer.set_pixel(x as u32, y as u32, depth);
+                                    }
+                                }
+                                else {
+                                    continue;
+                                }
+                            }
+                            render_target.set_pixel(x as u32, y as u32, color);
                         }
                     }
                 }
             }
         }
 
+    }
+}
+
+fn clip_intersect_edge(v0: Vertex, v1: Vertex, val0: f32, val1: f32) -> Vertex {
+    let t = val0 / (val0 - val1);
+    Vertex{
+        position: (1.0 - t) * v0.position + t * v1.position,
+        color: (1.0 - t) * v0.color + t * v1.color,
+    }
+}
+
+fn clip_triangle_against_plane(vertices: &[Vertex], equation: Float4, clipped: &mut Vec<Vertex>) {
+    let values = [
+        vertices[0].position.dot(equation),
+        vertices[1].position.dot(equation),
+        vertices[2].position.dot(equation),
+    ];
+
+    let mask: u8 =
+        (values[0] < 0.0) as u8
+            | ((values[1] < 0.0) as u8) << 1
+            | ((values[2] < 0.0) as u8) << 2;
+
+    match mask {
+        0b000 => {
+            clipped.push(vertices[0]);
+            clipped.push(vertices[1]);
+            clipped.push(vertices[2]);
+        }
+        0b001 => {
+            let v01 = clip_intersect_edge(vertices[0], vertices[1], values[0], values[1]);
+            let v02 = clip_intersect_edge(vertices[0], vertices[2], values[0], values[2]);
+            clipped.push(v01);
+            clipped.push(vertices[1]);
+            clipped.push(vertices[2]);
+            clipped.push(v01);
+            clipped.push(vertices[2]);
+            clipped.push(v02);
+        }
+        0b010 => {
+            let v10 = clip_intersect_edge(vertices[1], vertices[0], values[1], values[0]);
+            let v12 = clip_intersect_edge(vertices[1], vertices[2], values[1], values[2]);
+            clipped.push(vertices[0]);
+            clipped.push(v10);
+            clipped.push(vertices[2]);
+            clipped.push(vertices[2]);
+            clipped.push(v10);
+            clipped.push(v12);
+        }
+        0b011 => {
+            let v02 = clip_intersect_edge(vertices[0], vertices[2], values[0], values[2]);
+            let v12 = clip_intersect_edge(vertices[1], vertices[2], values[1], values[2]);
+            clipped.push(v02);
+            clipped.push(v12);
+            clipped.push(vertices[2]);
+        }
+        0b100 => {
+            let v20 = clip_intersect_edge(vertices[2], vertices[0], values[2], values[0]);
+            let v21 = clip_intersect_edge(vertices[2], vertices[1], values[2], values[1]);
+            clipped.push(vertices[0]);
+            clipped.push(vertices[1]);
+            clipped.push(v20);
+            clipped.push(v20);
+            clipped.push(vertices[1]);
+            clipped.push(v21);
+        }
+        0b101 => {
+            let v01 = clip_intersect_edge(vertices[0], vertices[1], values[0], values[1]);
+            let v21 = clip_intersect_edge(vertices[2], vertices[1], values[2], values[1]);
+            clipped.push(v01);
+            clipped.push(vertices[1]);
+            clipped.push(v21);
+        }
+        0b110 => {
+            let v10 = clip_intersect_edge(vertices[1], vertices[0], values[1], values[0]);
+            let v20 = clip_intersect_edge(vertices[2], vertices[0], values[2], values[0]);
+            clipped.push(vertices[0]);
+            clipped.push(v10);
+            clipped.push(v20);
+        }
+        0b111 => {
+
+        }
+        _ => {},
+    }
+}
+
+fn clip_vertices(vertices: [Vertex; 3]) -> Vec<Vertex> {
+    let mut input: Vec<Vertex> = vertices.to_vec();
+    let equations: [Float4; 2] = [
+        Float4::new(0.0, 0.0, 1.0, 0.0),
+        Float4::new(0.0, 0.0, -1.0, 1.0),
+    ];
+
+    for equation in equations.into_iter() {
+        let mut output = Vec::new();
+        for triangle in input.chunks_exact(3) {
+            clip_triangle_against_plane(triangle, equation, &mut output);
+        }
+        input = output;
+    }
+
+    input
+}
+
+const fn passed_depth_test(depth_test: DepthTest, value: u32, reference: u32) -> bool {
+    match depth_test {
+        DepthTest::Never => false,
+        DepthTest::Always => true,
+        DepthTest::Less => value < reference,
+        DepthTest::LessOrEqual => value <= reference,
+        DepthTest::Equal => value == reference,
+        DepthTest::GreaterOrEqual => value >= reference,
+        DepthTest::Greater => value > reference,
+        DepthTest::NotEqual => value != reference,
     }
 }

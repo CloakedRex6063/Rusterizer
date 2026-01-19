@@ -1,4 +1,4 @@
-use crate::ImageView;
+use crate::image_view::{RenderTarget};
 use sdl3::pixels::PixelFormat;
 use sdl3::render::{BlendMode, Canvas, TextureCreator};
 use sdl3::video::WindowContext;
@@ -78,11 +78,11 @@ impl Window {
         self.resized
     }
 
-    pub fn present(&mut self, image_view: &ImageView) {
+    pub fn present(&mut self, render_target: &RenderTarget) {
         let src = unsafe {
             std::slice::from_raw_parts(
-                image_view.get_pixels().as_ptr() as *const u8,
-                image_view.get_pixels().len() * 4,
+                render_target.pixels.as_ptr() as *const u8,
+                render_target.pixels.len() * 4,
             )
         };
         self.texture.pixels.copy_from_slice(src);

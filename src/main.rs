@@ -1,35 +1,24 @@
 use crate::command::Command;
-use crate::math::{Color, Float3, Float4, Matrix4};
+use crate::image_view::{DepthBuffer, DepthTest, Image, RenderTarget};
+use crate::math::{Float3, Float4, Matrix4};
+use crate::meshes::Cube;
 use crate::viewport::Viewport;
 use crate::window::Window;
 use std::cmp::PartialEq;
 use std::time::Instant;
-use crate::meshes::{Cube};
 
 mod command;
 mod image_view;
 mod math;
+mod meshes;
 mod viewport;
 mod window;
-mod meshes;
-
-struct ImageView {
-    pixels: Vec<Color>,
-    width: u32,
-    height: u32,
-}
 
 #[derive(Eq, PartialEq)]
 enum CullMode {
     None,
     Clockwise,
     CounterClockwise,
-}
-
-struct Mesh {
-    positions: Vec<Float3>,
-    indices: Vec<u32>,
-    colors: Vec<Float4>,
 }
 
 #[macro_export]
@@ -47,7 +36,8 @@ macro_rules! profile {
 
 fn main() {
     let mut window = Window::new();
-    let mut image_view = ImageView::new(1280, 720);
+    let mut render_target = Image::new(1280, 720);
+    let mut depth_buffer = DepthBuffer::new(1280, 720);
     let mut command = Command::new();
 
     let cube = Cube::new();
@@ -64,7 +54,8 @@ fn main() {
 
         let (width, height) = window.get_window_size();
         if window.is_resized() {
-            image_view = ImageView::new(width as u32, height as u32);
+            render_target = RenderTarget::new(width as u32, height as u32);
+            depth_buffer = DepthBuffer::new(width as u32, height as u32);
         }
 
         let viewport = Viewport {
@@ -77,22 +68,36 @@ fn main() {
 
         command.set_cull_mode(CullMode::Clockwise);
 
+        command.set_depth_test(DepthTest::Less);
+        command.toggle_depth_write(true);
+
         profile!("Clear Time", {
-            command.clear_image(&mut image_view, Float4::new(1.0, 1.0, 1.0, 1.0));
+            command.clear_render_target(&mut render_target, Float4::new(1.0, 1.0, 1.0, 1.0));
+            command.clear_depth_buffer(&mut depth_buffer, u32::MAX);
         });
 
         profile!("Mesh Render Time", {
-            let model = Matrix4::translate(Float3::new(0.0, 0.0, -5.0))
+            for i in -2..2 {
+                let model = Matrix4::translate(Float3::new(i as f32, 0.0, -5.0))
                     * Matrix4::rotate_yz(time)
                     * Matrix4::rotate_xy(time);
-            let transform =
-                    Matrix4::perspective(0.01, 10.0, std::f32::consts::PI / 3.0, width as f32 * 1.0 / height as f32)
-                    * model;
-            command.draw_mesh(&mut image_view, &cube.mesh, transform);
+                let transform = Matrix4::perspective(
+                    0.01,
+                    100.0,
+                    std::f32::consts::PI / 3.0,
+                    width as f32 * 1.0 / height as f32,
+                ) * model;
+                command.draw_mesh(
+                    &mut render_target,
+                    Some(&mut depth_buffer),
+                    &cube.mesh,
+                    transform,
+                );
+            }
         });
 
         profile!("Present Time", {
-            window.present(&image_view);
+            window.present(&render_target);
         });
     }
 }

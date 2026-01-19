@@ -1,5 +1,10 @@
 use crate::math::{Float3, Float4};
-use crate::Mesh;
+
+pub struct Mesh {
+    pub positions: Vec<Float3>,
+    pub indices: Vec<u32>,
+    pub colors: Vec<Float4>,
+}
 
 pub struct Cube
 {
