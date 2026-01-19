@@ -232,13 +232,21 @@ impl Command {
                         let det20p = (v0 - v2).det2d(p - v2);
 
                         if det01p >= 0.0 && det12p >= 0.0 && det20p >= 0.0 {
-                            let l0 = (v1 - p).det2d(v2 - p) / det012;
-                            let l1 = (v2 - p).det2d(v0 - p) / det012;
-                            let l2 = (v0 - p).det2d(v1 - p) / det012;
+                            let mut l0 = (v1 - p).det2d(v2 - p) / det012 / v0.w;
+                            let mut l1 = (v2 - p).det2d(v0 - p) / det012 / v1.w;
+                            let mut l2 = (v0 - p).det2d(v1 - p) / det012 / v2.w;
+
+                            let lsum = l0 + l1 + l2;
+
+                            l0 /= lsum;
+                            l1 /= lsum;
+                            l2 /= lsum;
+
+                            let color = Color::from(l0 * c0 + l1 * c1 + l2 * c2);
                             image.set_pixel(
                                 x as u32,
                                 y as u32,
-                                Color::from(l0 * c0 + l1 * c1 + l2 * c2),
+                                color,
                             );
                         }
                     }

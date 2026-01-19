@@ -245,6 +245,27 @@ pub struct Color {
     color: [u8; 4],
 }
 
+impl ops::Index<usize> for Color {
+    type Output = u8;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.color[index]
+    }
+}
+
+impl ops::IndexMut<usize> for Color {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.color[index]
+    }
+}
+
+impl Color
+{
+    pub fn new(r: u8, g: u8, b: u8) -> Self {
+        Self { color: [r, g, b, 255] }
+    }
+}
+
 impl From<Float4> for Color {
     fn from(c: Float4) -> Self {
         Self {

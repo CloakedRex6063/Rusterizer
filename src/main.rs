@@ -4,12 +4,14 @@ use crate::viewport::Viewport;
 use crate::window::Window;
 use std::cmp::PartialEq;
 use std::time::Instant;
+use crate::meshes::{Cube};
 
 mod command;
 mod image_view;
 mod math;
 mod viewport;
 mod window;
+mod meshes;
 
 struct ImageView {
     pixels: Vec<Color>,
@@ -48,87 +50,7 @@ fn main() {
     let mut image_view = ImageView::new(1280, 720);
     let mut command = Command::new();
 
-    let positions = vec![
-        // -X face
-        Float3::new(-1.0, -1.0, -1.0),
-        Float3::new(-1.0, 1.0, -1.0),
-        Float3::new(-1.0, -1.0, 1.0),
-        Float3::new(-1.0, 1.0, 1.0),
-        // +X face
-        Float3::new(1.0, -1.0, -1.0),
-        Float3::new(1.0, 1.0, -1.0),
-        Float3::new(1.0, -1.0, 1.0),
-        Float3::new(1.0, 1.0, 1.0),
-        // -Y face
-        Float3::new(-1.0, -1.0, -1.0),
-        Float3::new(1.0, -1.0, -1.0),
-        Float3::new(-1.0, -1.0, 1.0),
-        Float3::new(1.0, -1.0, 1.0),
-        // +Y face
-        Float3::new(-1.0, 1.0, -1.0),
-        Float3::new(1.0, 1.0, -1.0),
-        Float3::new(-1.0, 1.0, 1.0),
-        Float3::new(1.0, 1.0, 1.0),
-        // -Z face
-        Float3::new(-1.0, -1.0, -1.0),
-        Float3::new(1.0, -1.0, -1.0),
-        Float3::new(-1.0, 1.0, -1.0),
-        Float3::new(1.0, 1.0, -1.0),
-        // +Z face
-        Float3::new(-1.0, -1.0, 1.0),
-        Float3::new(1.0, -1.0, 1.0),
-        Float3::new(-1.0, 1.0, 1.0),
-        Float3::new(1.0, 1.0, 1.0),
-    ];
-
-    let colors = vec![
-        // -X face
-        Float4::new(0.0, 1.0, 1.0, 1.0),
-        Float4::new(0.0, 1.0, 1.0, 1.0),
-        Float4::new(0.0, 1.0, 1.0, 1.0),
-        Float4::new(0.0, 1.0, 1.0, 1.0),
-        // +X face
-        Float4::new(1.0, 0.0, 0.0, 1.0),
-        Float4::new(1.0, 0.0, 0.0, 1.0),
-        Float4::new(1.0, 0.0, 0.0, 1.0),
-        Float4::new(1.0, 0.0, 0.0, 1.0),
-        // -Y face
-        Float4::new(1.0, 0.0, 1.0, 1.0),
-        Float4::new(1.0, 0.0, 1.0, 1.0),
-        Float4::new(1.0, 0.0, 1.0, 1.0),
-        Float4::new(1.0, 0.0, 1.0, 1.0),
-        // +Y face
-        Float4::new(0.0, 1.0, 0.0, 1.0),
-        Float4::new(0.0, 1.0, 0.0, 1.0),
-        Float4::new(0.0, 1.0, 0.0, 1.0),
-        Float4::new(0.0, 1.0, 0.0, 1.0),
-        // -Z face
-        Float4::new(1.0, 1.0, 0.0, 1.0),
-        Float4::new(1.0, 1.0, 0.0, 1.0),
-        Float4::new(1.0, 1.0, 0.0, 1.0),
-        Float4::new(1.0, 1.0, 0.0, 1.0),
-        // +Z face
-        Float4::new(0.0, 0.0, 1.0, 1.0),
-        Float4::new(0.0, 0.0, 1.0, 1.0),
-        Float4::new(0.0, 0.0, 1.0, 1.0),
-        Float4::new(0.0, 0.0, 1.0, 1.0),
-    ];
-
-    let indices: Vec<u32> = vec![
-        // -X face
-        0, 2, 1, 1, 2, 3, // +X face
-        4, 5, 6, 6, 5, 7, // -Y face
-        8, 9, 10, 10, 9, 11, // +Y face
-        12, 14, 13, 14, 15, 13, // -Z face
-        16, 18, 17, 17, 18, 19, // +Z face
-        20, 21, 22, 21, 23, 22,
-    ];
-
-    let mesh = Mesh {
-        positions,
-        colors,
-        indices,
-    };
+    let cube = Cube::new();
 
     let mut last_time = Instant::now();
     let mut time: f32 = 0.0;
@@ -161,12 +83,12 @@ fn main() {
 
         profile!("Mesh Render Time", {
             let model = Matrix4::translate(Float3::new(0.0, 0.0, -5.0))
-                    * Matrix4::rotate_zx(time)
+                    * Matrix4::rotate_yz(time)
                     * Matrix4::rotate_xy(time);
             let transform =
                     Matrix4::perspective(0.01, 10.0, std::f32::consts::PI / 3.0, width as f32 * 1.0 / height as f32)
                     * model;
-            command.draw_mesh(&mut image_view, &mesh, transform);
+            command.draw_mesh(&mut image_view, &cube.mesh, transform);
         });
 
         profile!("Present Time", {
