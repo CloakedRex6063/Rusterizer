@@ -1,14 +1,14 @@
-use crate::math::Interpolate;
 use crate::command::{Command, Shader};
 use crate::image_view::{DepthBuffer, DepthTest, RenderTarget, Texture};
+use crate::math::Interpolate;
 use crate::math::{Float2, Float3, Float4, Matrix4};
 use crate::meshes::{Cube, Mesh};
 use crate::viewport::Viewport;
 use crate::window::Window;
+use interpolate_macro::Interpolate;
 use std::cmp::PartialEq;
 use std::path::Path;
 use std::time::Instant;
-use interpolate_macro::Interpolate;
 
 mod command;
 mod image_view;
@@ -56,28 +56,30 @@ fn main() {
     }
 
     #[derive(Default, Debug, Clone, Copy, Interpolate)]
-    struct VertexOutput{
+    struct VertexOutput {
         pub position: Float4,
         pub world_pos: Float4,
         pub uv: Float2,
     }
 
     let shader = Shader {
-        vertex_shader: Box::new(|vertex_index, mesh_data: &MeshData| -> (VertexOutput, Float4) {
-            let mut vertex = VertexOutput {
-                position: Float4::zero(),
-                world_pos: Float4::zero(),
-                uv: Float2::zero(),
-            };
-            vertex.position = mesh_data.perspective
-                * mesh_data.model
-                * mesh_data.mesh.positions[vertex_index as usize].as_point();
-            vertex.world_pos =
-                mesh_data.model * mesh_data.mesh.positions[vertex_index as usize].as_point();
-            vertex.uv = mesh_data.mesh.uvs[vertex_index as usize];
-            (vertex, vertex.position)
-        }),
-        fragment_shader: Box::new(|vertex: &VertexOutput, fragment_input: &MeshData |{
+        vertex_shader: Box::new(
+            |vertex_index, mesh_data: &MeshData| -> (VertexOutput, Float4) {
+                let mut vertex = VertexOutput {
+                    position: Float4::zero(),
+                    world_pos: Float4::zero(),
+                    uv: Float2::zero(),
+                };
+                vertex.position = mesh_data.perspective
+                    * mesh_data.model
+                    * mesh_data.mesh.positions[vertex_index as usize].as_point();
+                vertex.world_pos =
+                    mesh_data.model * mesh_data.mesh.positions[vertex_index as usize].as_point();
+                vertex.uv = mesh_data.mesh.uvs[vertex_index as usize];
+                (vertex, vertex.position)
+            },
+        ),
+        fragment_shader: Box::new(|vertex: &VertexOutput, fragment_input: &MeshData| {
             let color = fragment_input.texture.pixel_at_uv(vertex.uv);
             color
         }),
@@ -122,29 +124,27 @@ fn main() {
         let perspective =
             Matrix4::perspective(0.01, 100.0, std::f32::consts::PI / 3.0, aspect_ratio);
 
-        command.set_indices(&cube.mesh.indices);
-
         profile!("Mesh Render Time", {
-            for i in 0..1 {
-                let model = Matrix4::translate(Float3::new(i as f32 * 1.5, 0.0, -5.0))
-                    * Matrix4::rotate_yz(time)
-                    * Matrix4::rotate_xy(time);
+            command.set_positions(&cube.mesh.positions);
+            command.set_indices(&cube.mesh.indices);
+            let model = Matrix4::translate(Float3::new(0.0, 1.0, -5.0))
+                * Matrix4::rotate_yz(time)
+                * Matrix4::rotate_xy(time);
 
-                let mesh_data = MeshData {
-                    mesh: &cube.mesh,
-                    model,
-                    perspective,
-                    texture: &texture,
-                };
+            let mesh_data = MeshData {
+                mesh: &cube.mesh,
+                model,
+                perspective,
+                texture: &texture,
+            };
 
-                command.draw_indexed(
-                    &mut render_target,
-                    &mut depth_buffer,
-                    &shader,
-                    &mesh_data,
-                    &mesh_data
-                );
-            }
+            command.draw_indexed(
+                &mut render_target,
+                &mut depth_buffer,
+                &shader,
+                &mesh_data,
+                &mesh_data,
+            );
         });
 
         profile!("Present Time", {

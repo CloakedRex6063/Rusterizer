@@ -1,5 +1,5 @@
 use crate::image_view::{DepthBuffer, DepthTest, RenderTarget};
-use crate::math::{Color, Float4, Interpolate};
+use crate::math::{Color, Float3, Float4, Interpolate};
 use crate::viewport::Viewport;
 use crate::{CullMode, math};
 
@@ -12,6 +12,7 @@ pub struct Command<'a> {
     cull_mode: CullMode,
     viewport: Viewport,
     depth_state: DepthState,
+    positions: Option<&'a [Float3]>,
     indices: Option<&'a [u32]>,
 }
 
@@ -34,6 +35,7 @@ impl<'a> Command<'a> {
                 write: false,
                 test: DepthTest::Less,
             },
+            positions: None,
             indices: None,
         }
     }
@@ -54,6 +56,10 @@ impl<'a> Command<'a> {
         self.viewport = viewport;
     }
 
+    pub fn set_positions(&mut self, positions: &'a [Float3]) {
+        self.positions = Some(positions);
+    }
+
     pub fn set_indices(&mut self, indices: &'a [u32]) {
         self.indices = Some(indices);
     }
@@ -64,6 +70,32 @@ impl<'a> Command<'a> {
 
     pub fn clear_depth_buffer(&mut self, image: &mut DepthBuffer, value: f32) {
         image.clear_image(value);
+    }
+
+    pub fn draw<VertexInput, VertexOutput, FragmentInput>(
+        &mut self,
+        render_target: &mut RenderTarget,
+        depth_buffer: &mut DepthBuffer,
+        shader: &Shader<VertexInput, VertexOutput, FragmentInput>,
+        vertex_input: &VertexInput,
+        fragment_input: &FragmentInput,
+    ) where
+        VertexOutput: Interpolate,
+    {
+        let positions = self.positions.unwrap();
+        for vertex_index in (0..positions.len() - 2).step_by(3) {
+            let i0 = vertex_index;
+            let i1 = vertex_index + 1;
+            let i2 = vertex_index + 2;
+            self.rasterize_triangle(
+                render_target,
+                depth_buffer,
+                shader,
+                vertex_input,
+                fragment_input,
+                [i0, i1, i2],
+            );
+        }
     }
 
     pub fn draw_indexed<VertexInput, VertexOutput, FragmentInput>(
