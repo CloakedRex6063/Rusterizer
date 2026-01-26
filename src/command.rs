@@ -18,7 +18,7 @@ pub struct Command<'a> {
 
 pub struct Shader<VertexInput, VertexOutput, FragmentInput>
 {
-    pub vertex_shader: Box<dyn Fn(u32, &VertexInput) -> ([VertexOutput; 3], [Float4; 3])>,
+    pub vertex_shader: Box<dyn Fn(u32, &VertexInput) -> (VertexOutput, Float4)>,
     pub fragment_shader: Box<dyn Fn(&VertexOutput, &FragmentInput) -> Color>,
 }
 
@@ -71,13 +71,21 @@ impl <'a>Command<'a> {
         image.clear_image(value);
     }
 
-    pub fn draw_mesh<VertexInput, VertexOutput , FragmentInput>(&mut self, render_target: &mut RenderTarget, mut depth_buffer: Option<&mut DepthBuffer>, shader: &Shader<VertexInput, VertexOutput, FragmentInput>, vertex_input: &VertexInput, fragment_input: &FragmentInput)
+    pub fn draw_indexed<VertexInput, VertexOutput , FragmentInput>(&mut self, render_target: &mut RenderTarget, mut depth_buffer: Option<&mut DepthBuffer>, shader: &Shader<VertexInput, VertexOutput, FragmentInput>, vertex_input: &VertexInput, fragment_input: &FragmentInput)
     where VertexOutput: Interpolate, {
-        for vertex_index in (0..self.indices.unwrap().len() - 2).step_by(3) {
+        let indices = self.indices.unwrap();
+        for vertex_index in (0..indices.len() - 2).step_by(3) {
+            let mut i0 = vertex_index;
+            let mut i1 = vertex_index + 1;
+            let mut i2 = vertex_index + 2;
+            i0 = indices[i0] as usize;
+            i1 = indices[i1] as usize;
+            i2 = indices[i2] as usize;
+            let (mut vertex_output0, position0) = (shader.vertex_shader)(i0 as u32, &vertex_input);
+            let (mut vertex_output1, position1) = (shader.vertex_shader)(i1 as u32, &vertex_input);
+            let (mut vertex_output2, position2) = (shader.vertex_shader)(i2 as u32, &vertex_input);
 
-            let (mut vertex_output, positions) = (shader.vertex_shader)(vertex_index as u32, &vertex_input);
-
-            let (clipped_vertices, count) = clip_vertices(positions);
+            let (clipped_vertices, count) = clip_vertices([position0, position1, position2]);
 
             for triangle in clipped_vertices[..count as usize].chunks_exact(3)  {
                 let mut v0 = triangle[0];
@@ -99,7 +107,7 @@ impl <'a>Command<'a> {
                     CullMode::None => {
                         if ccw {
                             std::mem::swap(&mut v1, &mut v2);
-                            vertex_output.swap(2, 1);
+                            std::mem::swap(&mut vertex_output1, &mut vertex_output2);
                             det012 = -det012;
                         }
                     }
@@ -108,7 +116,7 @@ impl <'a>Command<'a> {
                             continue;
                         }
                         std::mem::swap(&mut v1, &mut v2);
-                        vertex_output.swap(2, 1);
+                        std::mem::swap(&mut vertex_output1, &mut vertex_output2);
                         det012 = -det012;
                     }
                     CullMode::CounterClockwise => {
@@ -170,7 +178,7 @@ impl <'a>Command<'a> {
                                 }
                             }
 
-                            let interpolated_output = VertexOutput::interp(l0, l1, l2, &vertex_output[0], &vertex_output[1], &vertex_output[2]);
+                            let interpolated_output = VertexOutput::interp(l0, l1, l2, &vertex_output0, &vertex_output1, &vertex_output2);
 
 
                             let color = (shader.fragment_shader)(&interpolated_output, &fragment_input);

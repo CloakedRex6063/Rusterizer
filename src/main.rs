@@ -63,45 +63,23 @@ fn main() {
     }
 
     let shader = Shader {
-        vertex_shader: Box::new(|vertex_index, mesh_data: &MeshData| -> ([VertexOutput; 3], [Float4; 3]) {
-            let mut i0 = vertex_index;
-            let mut i1 = vertex_index + 1;
-            let mut i2 = vertex_index + 2;
-
-            if !mesh_data.mesh.indices.is_empty() {
-                i0 = mesh_data.mesh.indices[i0 as usize];
-                i1 = mesh_data.mesh.indices[i1 as usize];
-                i2 = mesh_data.mesh.indices[i2 as usize];
-            }
-
-            let mut vertices = [VertexOutput {
+        vertex_shader: Box::new(|vertex_index, mesh_data: &MeshData| -> (VertexOutput, Float4) {
+            let mut vertex = VertexOutput {
                 position: Float4::zero(),
                 world_pos: Float4::zero(),
                 uv: Float2::zero(),
-            }; 3];
-            vertices[0].position = mesh_data.perspective
+            };
+            vertex.position = mesh_data.perspective
                 * mesh_data.model
-                * mesh_data.mesh.positions[i0 as usize].as_point();
-            vertices[1].position = mesh_data.perspective
-                * mesh_data.model
-                * mesh_data.mesh.positions[i1 as usize].as_point();
-            vertices[2].position = mesh_data.perspective
-                * mesh_data.model
-                * mesh_data.mesh.positions[i2 as usize].as_point();
-            vertices[0].world_pos =
-                mesh_data.model * mesh_data.mesh.positions[i0 as usize].as_point();
-            vertices[1].world_pos =
-                mesh_data.model * mesh_data.mesh.positions[i1 as usize].as_point();
-            vertices[2].world_pos =
-                mesh_data.model * mesh_data.mesh.positions[i2 as usize].as_point();
-            vertices[0].uv = mesh_data.mesh.uvs[i0 as usize];
-            vertices[1].uv = mesh_data.mesh.uvs[i1 as usize];
-            vertices[2].uv = mesh_data.mesh.uvs[i2 as usize];
-            let positions: [Float4; 3] = [ vertices[0].position, vertices[1].position, vertices[2].position ];
-            (vertices, positions)
+                * mesh_data.mesh.positions[vertex_index as usize].as_point();
+            vertex.world_pos =
+                mesh_data.model * mesh_data.mesh.positions[vertex_index as usize].as_point();
+            vertex.uv = mesh_data.mesh.uvs[vertex_index as usize];
+            (vertex, vertex.position)
         }),
         fragment_shader: Box::new(|vertex: &VertexOutput, fragment_input: &MeshData |{
-            fragment_input.texture.pixel_at_uv(vertex.uv)
+            let color = fragment_input.texture.pixel_at_uv(vertex.uv);
+            color
         }),
     };
 
@@ -159,7 +137,7 @@ fn main() {
                     texture: &texture,
                 };
 
-                command.draw_mesh(
+                command.draw_indexed(
                     &mut render_target,
                     Some(&mut depth_buffer),
                     &shader,
