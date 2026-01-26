@@ -1,10 +1,9 @@
 use crate::image_view::{DepthBuffer, DepthTest, RenderTarget};
 use crate::math::{Color, Float4, Interpolate};
 use crate::viewport::Viewport;
-use crate::{math, CullMode};
+use crate::{CullMode, math};
 
-struct DepthState
-{
+struct DepthState {
     write: bool,
     test: DepthTest,
 }
@@ -16,13 +15,12 @@ pub struct Command<'a> {
     indices: Option<&'a [u32]>,
 }
 
-pub struct Shader<VertexInput, VertexOutput, FragmentInput>
-{
+pub struct Shader<VertexInput, VertexOutput, FragmentInput> {
     pub vertex_shader: Box<dyn Fn(u32, &VertexInput) -> (VertexOutput, Float4)>,
     pub fragment_shader: Box<dyn Fn(&VertexOutput, &FragmentInput) -> Color>,
 }
 
-impl <'a>Command<'a> {
+impl<'a> Command<'a> {
     pub fn new() -> Self {
         Self {
             cull_mode: CullMode::None,
@@ -34,19 +32,17 @@ impl <'a>Command<'a> {
             },
             depth_state: DepthState {
                 write: false,
-                test: DepthTest::Less
+                test: DepthTest::Less,
             },
             indices: None,
         }
     }
 
-    pub fn set_depth_test(&mut self, depth_test: DepthTest)
-    {
+    pub fn set_depth_test(&mut self, depth_test: DepthTest) {
         self.depth_state.test = depth_test;
     }
 
-    pub fn toggle_depth_write(&mut self, write: bool)
-    {
+    pub fn toggle_depth_write(&mut self, write: bool) {
         self.depth_state.write = write;
     }
 
@@ -58,8 +54,7 @@ impl <'a>Command<'a> {
         self.viewport = viewport;
     }
 
-    pub fn set_indices(&mut self, indices: &'a [u32])
-    {
+    pub fn set_indices(&mut self, indices: &'a [u32]) {
         self.indices = Some(indices);
     }
 
@@ -71,8 +66,16 @@ impl <'a>Command<'a> {
         image.clear_image(value);
     }
 
-    pub fn draw_indexed<VertexInput, VertexOutput , FragmentInput>(&mut self, render_target: &mut RenderTarget, mut depth_buffer: Option<&mut DepthBuffer>, shader: &Shader<VertexInput, VertexOutput, FragmentInput>, vertex_input: &VertexInput, fragment_input: &FragmentInput)
-    where VertexOutput: Interpolate, {
+    pub fn draw_indexed<VertexInput, VertexOutput, FragmentInput>(
+        &mut self,
+        render_target: &mut RenderTarget,
+        depth_buffer: &mut DepthBuffer,
+        shader: &Shader<VertexInput, VertexOutput, FragmentInput>,
+        vertex_input: &VertexInput,
+        fragment_input: &FragmentInput,
+    ) where
+        VertexOutput: Interpolate,
+    {
         let indices = self.indices.unwrap();
         for vertex_index in (0..indices.len() - 2).step_by(3) {
             let mut i0 = vertex_index;
@@ -81,115 +84,140 @@ impl <'a>Command<'a> {
             i0 = indices[i0] as usize;
             i1 = indices[i1] as usize;
             i2 = indices[i2] as usize;
-            let (mut vertex_output0, position0) = (shader.vertex_shader)(i0 as u32, &vertex_input);
-            let (mut vertex_output1, position1) = (shader.vertex_shader)(i1 as u32, &vertex_input);
-            let (mut vertex_output2, position2) = (shader.vertex_shader)(i2 as u32, &vertex_input);
+            self.rasterize_triangle(
+                render_target,
+                depth_buffer,
+                shader,
+                vertex_input,
+                fragment_input,
+                [i0, i1, i2],
+            );
+        }
+    }
 
-            let (clipped_vertices, count) = clip_vertices([position0, position1, position2]);
+    fn rasterize_triangle<VertexInput, VertexOutput, FragmentInput>(
+        &mut self,
+        render_target: &mut RenderTarget,
+        depth_buffer: &mut DepthBuffer,
+        shader: &Shader<VertexInput, VertexOutput, FragmentInput>,
+        vertex_input: &VertexInput,
+        fragment_input: &FragmentInput,
+        triangle_indices: [usize; 3],
+    ) where
+        VertexOutput: Interpolate,
+    {
+        let (vertex_output0, position0) =
+            (shader.vertex_shader)(triangle_indices[0] as u32, &vertex_input);
+        let (mut vertex_output1, position1) =
+            (shader.vertex_shader)(triangle_indices[1] as u32, &vertex_input);
+        let (mut vertex_output2, position2) =
+            (shader.vertex_shader)(triangle_indices[2] as u32, &vertex_input);
 
-            for triangle in clipped_vertices[..count as usize].chunks_exact(3)  {
-                let mut v0 = triangle[0];
-                let mut v1 = triangle[1];
-                let mut v2 = triangle[2];
+        let (clipped_vertices, count) = clip_vertices([position0, position1, position2]);
 
-                v0 = math::perspective_divide(v0);
-                v1 = math::perspective_divide(v1);
-                v2 = math::perspective_divide(v2);
+        for triangle in clipped_vertices[..count as usize].chunks_exact(3) {
+            let mut v0 = triangle[0];
+            let mut v1 = triangle[1];
+            let mut v2 = triangle[2];
 
-                v0 = self.viewport.to_screen_space(v0);
-                v1 = self.viewport.to_screen_space(v1);
-                v2 = self.viewport.to_screen_space(v2);
+            v0 = math::perspective_divide(v0);
+            v1 = math::perspective_divide(v1);
+            v2 = math::perspective_divide(v2);
 
-                let mut det012 = (v1 - v0).det2d(v2 - v0);
-                let ccw = det012 < 0.0;
+            v0 = self.viewport.to_screen_space(v0);
+            v1 = self.viewport.to_screen_space(v1);
+            v2 = self.viewport.to_screen_space(v2);
 
-                match self.cull_mode {
-                    CullMode::None => {
-                        if ccw {
-                            std::mem::swap(&mut v1, &mut v2);
-                            std::mem::swap(&mut vertex_output1, &mut vertex_output2);
-                            det012 = -det012;
-                        }
-                    }
-                    CullMode::Clockwise => {
-                        if !ccw {
-                            continue;
-                        }
+            let mut det012 = (v1 - v0).det2d(v2 - v0);
+            let ccw = det012 < 0.0;
+
+            match self.cull_mode {
+                CullMode::None => {
+                    if ccw {
                         std::mem::swap(&mut v1, &mut v2);
                         std::mem::swap(&mut vertex_output1, &mut vertex_output2);
                         det012 = -det012;
                     }
-                    CullMode::CounterClockwise => {
-                        if ccw {
-                            continue;
-                        }
+                }
+                CullMode::Clockwise => {
+                    if !ccw {
+                        continue;
+                    }
+                    std::mem::swap(&mut v1, &mut v2);
+                    std::mem::swap(&mut vertex_output1, &mut vertex_output2);
+                    det012 = -det012;
+                }
+                CullMode::CounterClockwise => {
+                    if ccw {
+                        continue;
                     }
                 }
+            }
 
-                let mut x_min: i32 = self.viewport.x_min.max(0);
-                let mut x_max: i32 = self.viewport.x_max.min(render_target.width as i32) - 1;
-                let mut y_min: i32 = self.viewport.y_min.max(0);
-                let mut y_max: i32 = self.viewport.y_max.min(render_target.height as i32) - 1;
+            let mut x_min: i32 = self.viewport.x_min.max(0);
+            let mut x_max: i32 = self.viewport.x_max.min(render_target.width as i32) - 1;
+            let mut y_min: i32 = self.viewport.y_min.max(0);
+            let mut y_max: i32 = self.viewport.y_max.min(render_target.height as i32) - 1;
 
-                let tri_x_min = v0.x.floor().min(v1.x.floor()).min(v2.x.floor()) as i32;
+            let tri_x_min = v0.x.floor().min(v1.x.floor()).min(v2.x.floor()) as i32;
 
-                let tri_x_max = v0.x.floor().max(v1.x.floor()).max(v2.x.floor()) as i32;
+            let tri_x_max = v0.x.floor().max(v1.x.floor()).max(v2.x.floor()) as i32;
 
-                let tri_y_min = v0.y.floor().min(v1.y.floor()).min(v2.y.floor()) as i32;
+            let tri_y_min = v0.y.floor().min(v1.y.floor()).min(v2.y.floor()) as i32;
 
-                let tri_y_max = v0.y.floor().max(v1.y.floor()).max(v2.y.floor()) as i32;
+            let tri_y_max = v0.y.floor().max(v1.y.floor()).max(v2.y.floor()) as i32;
 
-                x_min = x_min.max(tri_x_min);
-                x_max = x_max.min(tri_x_max);
-                y_min = y_min.max(tri_y_min);
-                y_max = y_max.min(tri_y_max);
+            x_min = x_min.max(tri_x_min);
+            x_max = x_max.min(tri_x_max);
+            y_min = y_min.max(tri_y_min);
+            y_max = y_max.min(tri_y_max);
 
-                for x in x_min..=x_max {
-                    for y in y_min..=y_max {
-                        let p = Float4::new(x as f32 + 0.5, y as f32 + 0.5, 0.0, 0.0);
-                        let det01p = (v1 - v0).det2d(p - v0);
-                        let det12p = (v2 - v1).det2d(p - v1);
-                        let det20p = (v0 - v2).det2d(p - v2);
+            for x in x_min..=x_max {
+                for y in y_min..=y_max {
+                    let p = Float4::new(x as f32 + 0.5, y as f32 + 0.5, 0.0, 0.0);
+                    let det01p = (v1 - v0).det2d(p - v0);
+                    let det12p = (v2 - v1).det2d(p - v1);
+                    let det20p = (v0 - v2).det2d(p - v2);
 
+                    if det01p >= 0.0 && det12p >= 0.0 && det20p >= 0.0 {
+                        let mut l0 = (v1 - p).det2d(v2 - p) / det012 / v0.w;
+                        let mut l1 = (v2 - p).det2d(v0 - p) / det012 / v1.w;
+                        let mut l2 = (v0 - p).det2d(v1 - p) / det012 / v2.w;
 
-                        if det01p >= 0.0 && det12p >= 0.0 && det20p >= 0.0 {
-                            let mut l0 = (v1 - p).det2d(v2 - p) / det012 / v0.w;
-                            let mut l1 = (v2 - p).det2d(v0 - p) / det012 / v1.w;
-                            let mut l2 = (v0 - p).det2d(v1 - p) / det012 / v2.w;
+                        let l_sum = l0 + l1 + l2;
 
-                            let l_sum = l0 + l1 + l2;
+                        l0 /= l_sum;
+                        l1 /= l_sum;
+                        l2 /= l_sum;
 
-                            l0 /= l_sum;
-                            l1 /= l_sum;
-                            l2 /= l_sum;
+                        let old_depth = depth_buffer.get_pixel(x as u32, y as u32);
 
-                            if let Some(depth_buffer) = depth_buffer.as_mut() {
-                                let old_depth = depth_buffer.get_pixel(x as u32, y as u32);
+                        let z = l0 * v0.z + l1 * v1.z + l2 * v2.z;
 
-                                let z = l0 * v0.z + l1 * v1.z + l2 * v2.z;
-
-                                if passed_depth_test(self.depth_state.test, z, old_depth) {
-                                    if self.depth_state.write {
-                                        depth_buffer.set_pixel(x as u32, y as u32, z);
-                                    }
-                                }
-                                else {
-                                    continue;
-                                }
+                        if passed_depth_test(self.depth_state.test, z, old_depth) {
+                            if self.depth_state.write {
+                                depth_buffer.set_pixel(x as u32, y as u32, z);
                             }
-
-                            let interpolated_output = VertexOutput::interp(l0, l1, l2, &vertex_output0, &vertex_output1, &vertex_output2);
-
-
-                            let color = (shader.fragment_shader)(&interpolated_output, &fragment_input);
-
-                            render_target.set_pixel(x as u32, y as u32, color);
+                        } else {
+                            continue;
                         }
+
+                        let interpolated_output = VertexOutput::interp(
+                            l0,
+                            l1,
+                            l2,
+                            &vertex_output0,
+                            &vertex_output1,
+                            &vertex_output2,
+                        );
+
+                        let color = (shader.fragment_shader)(&interpolated_output, &fragment_input);
+
+                        render_target.set_pixel(x as u32, y as u32, color);
                     }
                 }
             }
         }
-
     }
 }
 
@@ -198,7 +226,12 @@ fn clip_intersect_edge(v0: Float4, v1: Float4, val0: f32, val1: f32) -> Float4 {
     (1.0 - t) * v0 + t * v1
 }
 
-fn clip_triangle_against_plane(vertices: &[Float4], equation: Float4, clipped: &mut [Float4; 12], count: &mut u32) {
+fn clip_triangle_against_plane(
+    vertices: &[Float4],
+    equation: Float4,
+    clipped: &mut [Float4; 12],
+    count: &mut u32,
+) {
     let values = [
         vertices[0].dot(equation),
         vertices[1].dot(equation),
@@ -206,9 +239,7 @@ fn clip_triangle_against_plane(vertices: &[Float4], equation: Float4, clipped: &
     ];
 
     let mask: u8 =
-        (values[0] < 0.0) as u8
-            | ((values[1] < 0.0) as u8) << 1
-            | ((values[2] < 0.0) as u8) << 2;
+        (values[0] < 0.0) as u8 | ((values[1] < 0.0) as u8) << 1 | ((values[2] < 0.0) as u8) << 2;
 
     match mask {
         0b000 => {
@@ -297,10 +328,8 @@ fn clip_triangle_against_plane(vertices: &[Float4], equation: Float4, clipped: &
             clipped[*count as usize] = v20;
             *count += 1;
         }
-        0b111 => {
-
-        }
-        _ => {},
+        0b111 => {}
+        _ => {}
     }
 }
 

@@ -139,7 +139,7 @@ fn main() {
 
                 command.draw_indexed(
                     &mut render_target,
-                    Some(&mut depth_buffer),
+                    &mut depth_buffer,
                     &shader,
                     &mesh_data,
                     &mesh_data
