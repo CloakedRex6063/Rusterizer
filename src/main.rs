@@ -73,7 +73,7 @@ fn main() {
 
         profile!("Clear Time", {
             command.clear_render_target(&mut render_target, Float4::new(1.0, 1.0, 1.0, 1.0));
-            command.clear_depth_buffer(&mut depth_buffer, u32::MAX);
+            command.clear_depth_buffer(&mut depth_buffer, 1.0);
         });
 
         profile!("Mesh Render Time", {

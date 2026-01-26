@@ -7,7 +7,7 @@ pub struct Image<T> {
 }
 
 pub type RenderTarget = Image<Color>;
-pub type DepthBuffer = Image<u32>;
+pub type DepthBuffer = Image<f32>;
 
 impl <T: Copy + Default>Image<T> {
     pub fn new(width: u32, height: u32) -> Self {
@@ -37,7 +37,7 @@ impl RenderTarget
 
 impl DepthBuffer
 {
-    pub fn clear_image(&mut self, color: u32) {
+    pub fn clear_image(&mut self, color: f32) {
         self.pixels.fill(color);
     }
 }

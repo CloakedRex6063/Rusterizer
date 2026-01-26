@@ -16,7 +16,7 @@ pub struct Command {
     depth_state: DepthState,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy)]
 struct Vertex
 {
     position: Float4,
@@ -62,7 +62,7 @@ impl Command {
         image.clear_image(color);
     }
 
-    pub fn clear_depth_buffer(&mut self, image: &mut DepthBuffer, value: u32) {
+    pub fn clear_depth_buffer(&mut self, image: &mut DepthBuffer, value: f32) {
         image.clear_image(value);
     }
 
@@ -86,9 +86,9 @@ impl Command {
             vertices[1].color = mesh.colors[i1 as usize];
             vertices[2].color = mesh.colors[i2 as usize];
 
-            let clipped_vertices = clip_vertices(vertices);
+            let (clipped_vertices, count) = clip_vertices(vertices);
 
-            for triangle in clipped_vertices.chunks_exact(3)  {
+            for triangle in clipped_vertices[..count as usize].chunks_exact(3)  {
                 let mut v0 = triangle[0].position;
                 let mut v1 = triangle[1].position;
                 let mut v2 = triangle[2].position;
@@ -174,11 +174,10 @@ impl Command {
                                 let old_depth = depth_buffer.get_pixel(x as u32, y as u32);
 
                                 let z = l0 * v0.z + l1 * v1.z + l2 * v2.z;
-                                let depth = (z * u32::MAX as f32) as u32;
 
-                                if passed_depth_test(self.depth_state.test, depth, old_depth) {
+                                if passed_depth_test(self.depth_state.test, z, old_depth) {
                                     if self.depth_state.write {
-                                        depth_buffer.set_pixel(x as u32, y as u32, depth);
+                                        depth_buffer.set_pixel(x as u32, y as u32, z);
                                     }
                                 }
                                 else {
@@ -203,7 +202,7 @@ fn clip_intersect_edge(v0: Vertex, v1: Vertex, val0: f32, val1: f32) -> Vertex {
     }
 }
 
-fn clip_triangle_against_plane(vertices: &[Vertex], equation: Float4, clipped: &mut Vec<Vertex>) {
+fn clip_triangle_against_plane(vertices: &[Vertex], equation: Float4, clipped: &mut [Vertex; 12], count: &mut u32) {
     let values = [
         vertices[0].position.dot(equation),
         vertices[1].position.dot(equation),
@@ -217,60 +216,90 @@ fn clip_triangle_against_plane(vertices: &[Vertex], equation: Float4, clipped: &
 
     match mask {
         0b000 => {
-            clipped.push(vertices[0]);
-            clipped.push(vertices[1]);
-            clipped.push(vertices[2]);
+            clipped[*count as usize] = vertices[0];
+            *count += 1;
+            clipped[*count as usize] = vertices[1];
+            *count += 1;
+            clipped[*count as usize] = vertices[2];
+            *count += 1;
         }
         0b001 => {
             let v01 = clip_intersect_edge(vertices[0], vertices[1], values[0], values[1]);
             let v02 = clip_intersect_edge(vertices[0], vertices[2], values[0], values[2]);
-            clipped.push(v01);
-            clipped.push(vertices[1]);
-            clipped.push(vertices[2]);
-            clipped.push(v01);
-            clipped.push(vertices[2]);
-            clipped.push(v02);
+            clipped[*count as usize] = v01;
+            *count += 1;
+            clipped[*count as usize] = vertices[1];
+            *count += 1;
+            clipped[*count as usize] = vertices[2];
+            *count += 1;
+            clipped[*count as usize] = v01;
+            *count += 1;
+            clipped[*count as usize] = vertices[2];
+            *count += 1;
+            clipped[*count as usize] = v02;
+            *count += 1;
         }
         0b010 => {
             let v10 = clip_intersect_edge(vertices[1], vertices[0], values[1], values[0]);
             let v12 = clip_intersect_edge(vertices[1], vertices[2], values[1], values[2]);
-            clipped.push(vertices[0]);
-            clipped.push(v10);
-            clipped.push(vertices[2]);
-            clipped.push(vertices[2]);
-            clipped.push(v10);
-            clipped.push(v12);
+            clipped[*count as usize] = vertices[0];
+            *count += 1;
+            clipped[*count as usize] = v10;
+            *count += 1;
+            clipped[*count as usize] = vertices[2];
+            *count += 1;
+            clipped[*count as usize] = vertices[2];
+            *count += 1;
+            clipped[*count as usize] = v10;
+            *count += 1;
+            clipped[*count as usize] = v12;
+            *count += 1;
         }
         0b011 => {
             let v02 = clip_intersect_edge(vertices[0], vertices[2], values[0], values[2]);
             let v12 = clip_intersect_edge(vertices[1], vertices[2], values[1], values[2]);
-            clipped.push(v02);
-            clipped.push(v12);
-            clipped.push(vertices[2]);
+            clipped[*count as usize] = v02;
+            *count += 1;
+            clipped[*count as usize] = v12;
+            *count += 1;
+            clipped[*count as usize] = vertices[2];
+            *count += 1;
         }
         0b100 => {
             let v20 = clip_intersect_edge(vertices[2], vertices[0], values[2], values[0]);
             let v21 = clip_intersect_edge(vertices[2], vertices[1], values[2], values[1]);
-            clipped.push(vertices[0]);
-            clipped.push(vertices[1]);
-            clipped.push(v20);
-            clipped.push(v20);
-            clipped.push(vertices[1]);
-            clipped.push(v21);
+            clipped[*count as usize] = vertices[0];
+            *count += 1;
+            clipped[*count as usize] = vertices[1];
+            *count += 1;
+            clipped[*count as usize] = v20;
+            *count += 1;
+            clipped[*count as usize] = v20;
+            *count += 1;
+            clipped[*count as usize] = vertices[1];
+            *count += 1;
+            clipped[*count as usize] = v21;
+            *count += 1;
         }
         0b101 => {
             let v01 = clip_intersect_edge(vertices[0], vertices[1], values[0], values[1]);
             let v21 = clip_intersect_edge(vertices[2], vertices[1], values[2], values[1]);
-            clipped.push(v01);
-            clipped.push(vertices[1]);
-            clipped.push(v21);
+            clipped[*count as usize] = v01;
+            *count += 1;
+            clipped[*count as usize] = vertices[1];
+            *count += 1;
+            clipped[*count as usize] = v21;
+            *count += 1;
         }
         0b110 => {
             let v10 = clip_intersect_edge(vertices[1], vertices[0], values[1], values[0]);
             let v20 = clip_intersect_edge(vertices[2], vertices[0], values[2], values[0]);
-            clipped.push(vertices[0]);
-            clipped.push(v10);
-            clipped.push(v20);
+            clipped[*count as usize] = vertices[0];
+            *count += 1;
+            clipped[*count as usize] = v10;
+            *count += 1;
+            clipped[*count as usize] = v20;
+            *count += 1;
         }
         0b111 => {
 
@@ -279,25 +308,27 @@ fn clip_triangle_against_plane(vertices: &[Vertex], equation: Float4, clipped: &
     }
 }
 
-fn clip_vertices(vertices: [Vertex; 3]) -> Vec<Vertex> {
-    let mut input: Vec<Vertex> = vertices.to_vec();
+fn clip_vertices(vertices: [Vertex; 3]) -> ([Vertex; 12], u32) {
+    let mut input: [Vertex; 12] = [Vertex::default(); 12];
+    input[0..3].copy_from_slice(&vertices);
+    let mut count = 3u32;
     let equations: [Float4; 2] = [
         Float4::new(0.0, 0.0, 1.0, 0.0),
         Float4::new(0.0, 0.0, -1.0, 1.0),
     ];
 
     for equation in equations.into_iter() {
-        let mut output = Vec::new();
-        for triangle in input.chunks_exact(3) {
-            clip_triangle_against_plane(triangle, equation, &mut output);
+        let mut output: [Vertex; 12] = [Vertex::default(); 12];
+        for triangle in input[..count as usize].chunks_exact(3) {
+            clip_triangle_against_plane(triangle, equation, &mut output, &mut count);
         }
         input = output;
     }
 
-    input
+    (input, count)
 }
 
-const fn passed_depth_test(depth_test: DepthTest, value: u32, reference: u32) -> bool {
+const fn passed_depth_test(depth_test: DepthTest, value: f32, reference: f32) -> bool {
     match depth_test {
         DepthTest::Never => false,
         DepthTest::Always => true,
