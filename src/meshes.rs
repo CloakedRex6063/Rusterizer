@@ -1,9 +1,9 @@
-use crate::math::{Float3, Float4};
+use crate::math::{Float2, Float3};
 
 pub struct Mesh {
     pub positions: Vec<Float3>,
     pub indices: Vec<u32>,
-    pub colors: Vec<Float4>,
+    pub uvs: Vec<Float2>,
 }
 
 pub struct Cube
@@ -47,39 +47,6 @@ impl Cube {
             Float3::new(1.0, 1.0, 1.0),
         ];
 
-        let colors = vec![
-            // -X face
-            Float4::new(0.0, 1.0, 1.0, 1.0),
-            Float4::new(0.0, 1.0, 1.0, 1.0),
-            Float4::new(0.0, 1.0, 1.0, 1.0),
-            Float4::new(0.0, 1.0, 1.0, 1.0),
-            // +X face
-            Float4::new(1.0, 0.0, 0.0, 1.0),
-            Float4::new(1.0, 0.0, 0.0, 1.0),
-            Float4::new(1.0, 0.0, 0.0, 1.0),
-            Float4::new(1.0, 0.0, 0.0, 1.0),
-            // -Y face
-            Float4::new(1.0, 0.0, 1.0, 1.0),
-            Float4::new(1.0, 0.0, 1.0, 1.0),
-            Float4::new(1.0, 0.0, 1.0, 1.0),
-            Float4::new(1.0, 0.0, 1.0, 1.0),
-            // +Y face
-            Float4::new(0.0, 1.0, 0.0, 1.0),
-            Float4::new(0.0, 1.0, 0.0, 1.0),
-            Float4::new(0.0, 1.0, 0.0, 1.0),
-            Float4::new(0.0, 1.0, 0.0, 1.0),
-            // -Z face
-            Float4::new(1.0, 1.0, 0.0, 1.0),
-            Float4::new(1.0, 1.0, 0.0, 1.0),
-            Float4::new(1.0, 1.0, 0.0, 1.0),
-            Float4::new(1.0, 1.0, 0.0, 1.0),
-            // +Z face
-            Float4::new(0.0, 0.0, 1.0, 1.0),
-            Float4::new(0.0, 0.0, 1.0, 1.0),
-            Float4::new(0.0, 0.0, 1.0, 1.0),
-            Float4::new(0.0, 0.0, 1.0, 1.0),
-        ];
-
         let indices: Vec<u32> = vec![
             // -X face
             0, 2, 1, 1, 2, 3, // +X face
@@ -90,10 +57,43 @@ impl Cube {
             20, 21, 22, 21, 23, 22,
         ];
 
+        let uvs = vec![
+            // -X face
+            Float2::new(0.0, 0.0),
+            Float2::new(1.0, 0.0),
+            Float2::new(0.0, 1.0),
+            Float2::new(1.0, 1.0),
+            // +X face
+            Float2::new(0.0, 0.0),
+            Float2::new(1.0, 0.0),
+            Float2::new(0.0, 1.0),
+            Float2::new(1.0, 1.0),
+            // -Y face
+            Float2::new(0.0, 0.0),
+            Float2::new(1.0, 0.0),
+            Float2::new(0.0, 1.0),
+            Float2::new(1.0, 1.0),
+            // +Y face
+            Float2::new(0.0, 0.0),
+            Float2::new(1.0, 0.0),
+            Float2::new(0.0, 1.0),
+            Float2::new(1.0, 1.0),
+            // -Z face
+            Float2::new(0.0, 0.0),
+            Float2::new(1.0, 0.0),
+            Float2::new(0.0, 1.0),
+            Float2::new(1.0, 1.0),
+            // +Z face
+            Float2::new(0.0, 0.0),
+            Float2::new(1.0, 0.0),
+            Float2::new(0.0, 1.0),
+            Float2::new(1.0, 1.0),
+        ];
+
         let mesh = Mesh {
             positions,
-            colors,
             indices,
+            uvs,
         };
 
         Self{
@@ -116,21 +116,21 @@ impl Square {
             Float3::new(1.0, 1.0, 0.0),
         ];
 
-        let colors = vec![
-            Float4::new(0.0, 0.0, 0.0, 1.0),
-            Float4::new(1.0, 0.0, 0.0, 1.0),
-            Float4::new(0.0, 1.0, 0.0, 1.0),
-            Float4::new(0.0, 0.0, 1.0, 1.0),
-        ];
-
         let indices = vec![
             0, 1, 2, 2, 1, 3,
+        ];
+
+        let uvs = vec![
+            Float2::new(0.0, 0.0),
+            Float2::new(1.0, 0.0),
+            Float2::new(0.0, 1.0),
+            Float2::new(1.0, 1.0),
         ];
 
         let mesh = Mesh{
             positions,
             indices,
-            colors,
+            uvs,
         };
 
         Self{

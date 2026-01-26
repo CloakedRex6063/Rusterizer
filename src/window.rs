@@ -24,12 +24,12 @@ pub struct Window {
 }
 
 impl Window {
-    pub fn new() -> Self {
+    pub fn new(width: u32, height: u32) -> Self {
         let context = sdl3::init().unwrap();
         let video = context.video().unwrap();
         let event_pump = context.event_pump().unwrap();
         let window = video
-            .window("Rusterizer", 1280, 720)
+            .window("Rusterizer", width, height)
             .resizable()
             .build()
             .unwrap();
@@ -37,15 +37,15 @@ impl Window {
         let texture_creator: &'static _ = Box::leak(Box::new(canvas.texture_creator()));
 
         let mut texture_data = texture_creator
-            .create_texture_streaming(PixelFormat::RGBA32, 1280, 720)
+            .create_texture_streaming(PixelFormat::RGBA32, width, height)
             .unwrap();
         texture_data.set_blend_mode(BlendMode::None);
 
         let texture = Texture {
-            pixels: vec![0; 1280 * 720 * 4],
+            pixels: vec![0; (width * height * 4) as usize],
             texture: texture_data,
-            width: 1280,
-            height: 720,
+            width,
+            height,
         };
 
         Self {
@@ -55,7 +55,7 @@ impl Window {
             canvas,
             texture_creator,
             texture,
-            window_size: (1280, 720),
+            window_size: (width as i32, height as i32),
             mouse_pos: (0, 0),
             running: true,
             resized: false,

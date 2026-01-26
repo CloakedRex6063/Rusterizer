@@ -1,5 +1,6 @@
 use num_traits::{One, Zero};
 use std::ops;
+use std::ops::{AddAssign, Mul};
 
 pub trait Number: Copy + Zero + One {}
 
@@ -32,6 +33,14 @@ impl<T: Number> Vec2<T> {
 pub type UInt2 = Vec2<u32>;
 pub type Int2 = Vec2<i32>;
 pub type Float2 = Vec2<f32>;
+
+impl Mul<Float2> for f32 {
+    type Output = Float2;
+
+    fn mul(self, rhs: Float2) -> Self::Output {
+        Float2::new(self * rhs.x, self * rhs.y)
+    }
+}
 
 impl<T: Number + ops::Add<Output = T>> ops::Add<Vec2<T>> for Vec2<T> {
     type Output = Vec2<T>;
@@ -115,6 +124,18 @@ impl<T: Number> Vec3<T> {
 pub type UInt3 = Vec3<u32>;
 pub type Int3 = Vec3<i32>;
 pub type Float3 = Vec3<f32>;
+
+impl Float3
+{
+    pub fn normalize(self) -> Self {
+        let len = ((self.x * self.x + self.y * self.y + self.z * self.z)).sqrt();
+        Self {
+            x: self.x / len,
+            y: self.y / len,
+            z: self.z / len,
+        }
+    }
+}
 
 impl<T: Number + ops::Add<Output = T>> ops::Add<Vec3<T>> for Vec3<T> {
     type Output = Vec3<T>;
@@ -256,6 +277,14 @@ impl ops::Index<usize> for Color {
 impl ops::IndexMut<usize> for Color {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         &mut self.color[index]
+    }
+}
+
+impl AddAssign<Float3> for Color {
+    fn add_assign(&mut self, rhs: Float3) {
+        self.color[0] += rhs.x as u8;
+        self.color[1] += rhs.y as u8;
+        self.color[2] += rhs.z as u8;
     }
 }
 
@@ -459,6 +488,15 @@ impl ops::Mul<f32> for Float4 {
 
     fn mul(self, rhs: f32) -> Float4 {
         Float4::new(self.x * rhs, self.y * rhs, self.z * rhs, self.w * rhs)
+    }
+}
+
+impl AddAssign for Color {
+    fn add_assign(&mut self, rhs: Self) {
+        self.color[0] = self.color[0].saturating_add(rhs.color[0]);
+        self.color[1] = self.color[1].saturating_add(rhs.color[1]);
+        self.color[2] = self.color[2].saturating_add(rhs.color[2]);
+        self.color[3] = self.color[3].saturating_add(rhs.color[3]);
     }
 }
 

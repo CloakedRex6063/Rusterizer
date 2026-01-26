@@ -1,10 +1,11 @@
-use crate::command::Command;
-use crate::image_view::{DepthBuffer, DepthTest, Image, RenderTarget};
+use crate::command::{Command, MeshData};
+use crate::image_view::{DepthBuffer, DepthTest, Texture, RenderTarget};
 use crate::math::{Float3, Float4, Matrix4};
 use crate::meshes::Cube;
 use crate::viewport::Viewport;
 use crate::window::Window;
 use std::cmp::PartialEq;
+use std::path::Path;
 use std::time::Instant;
 
 mod command;
@@ -13,6 +14,7 @@ mod math;
 mod meshes;
 mod viewport;
 mod window;
+mod light;
 
 #[derive(Eq, PartialEq)]
 enum CullMode {
@@ -35,8 +37,10 @@ macro_rules! profile {
 }
 
 fn main() {
-    let mut window = Window::new();
-    let mut render_target = Image::new(1280, 720);
+    let mut window = Window::new(1280, 720);
+    let mut render_target = RenderTarget::new(1280, 720);
+
+    let texture = Texture::from_file(Path::new("assets/bojan.jpg"));
     let mut depth_buffer = DepthBuffer::new(1280, 720);
     let mut command = Command::new();
 
@@ -76,22 +80,21 @@ fn main() {
             command.clear_depth_buffer(&mut depth_buffer, 1.0);
         });
 
+        let aspect_ratio = width as f32 / height as f32;
         profile!("Mesh Render Time", {
-            for i in -2..2 {
-                let model = Matrix4::translate(Float3::new(i as f32, 0.0, -5.0))
+            for i in -0..1 {
+                let model = Matrix4::translate(Float3::new(i as f32 * 1.5, 0.0, -5.0))
                     * Matrix4::rotate_yz(time)
                     * Matrix4::rotate_xy(time);
-                let transform = Matrix4::perspective(
-                    0.01,
-                    100.0,
-                    std::f32::consts::PI / 3.0,
-                    width as f32 * 1.0 / height as f32,
-                ) * model;
                 command.draw_mesh(
                     &mut render_target,
                     Some(&mut depth_buffer),
-                    &cube.mesh,
-                    transform,
+                    aspect_ratio,
+                    MeshData {
+                        mesh: &cube.mesh,
+                        transform: model,
+                        texture: &texture,
+                    },
                 );
             }
         });
