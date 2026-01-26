@@ -1,6 +1,5 @@
-use crate::image_view::{DepthBuffer, DepthTest, RenderTarget, Texture};
-use crate::math::{Float2, Float4, Matrix4};
-use crate::meshes::Mesh;
+use crate::image_view::{DepthBuffer, DepthTest, RenderTarget};
+use crate::math::{Color, Float4, Interpolate};
 use crate::viewport::Viewport;
 use crate::{math, CullMode};
 
@@ -10,28 +9,20 @@ struct DepthState
     test: DepthTest,
 }
 
-pub struct Command {
+pub struct Command<'a> {
     cull_mode: CullMode,
     viewport: Viewport,
     depth_state: DepthState,
+    indices: Option<&'a [u32]>,
 }
 
-pub struct MeshData<'a>
+pub struct Shader<VertexInput, VertexOutput, FragmentInput>
 {
-    pub mesh: &'a Mesh,
-    pub transform: Matrix4,
-    pub texture: &'a Texture,
+    pub vertex_shader: Box<dyn Fn(u32, &VertexInput) -> ([VertexOutput; 3], [Float4; 3])>,
+    pub fragment_shader: Box<dyn Fn(&VertexOutput, &FragmentInput) -> Color>,
 }
 
-#[derive(Default, Debug, Clone, Copy)]
-struct Vertex
-{
-    position: Float4,
-    color: Float4,
-    uv: Float2
-}
-
-impl Command {
+impl <'a>Command<'a> {
     pub fn new() -> Self {
         Self {
             cull_mode: CullMode::None,
@@ -45,6 +36,7 @@ impl Command {
                 write: false,
                 test: DepthTest::Less
             },
+            indices: None,
         }
     }
 
@@ -66,6 +58,11 @@ impl Command {
         self.viewport = viewport;
     }
 
+    pub fn set_indices(&mut self, indices: &'a [u32])
+    {
+        self.indices = Some(indices);
+    }
+
     pub fn clear_render_target(&mut self, image: &mut RenderTarget, color: Float4) {
         image.clear_image(color);
     }
@@ -74,43 +71,18 @@ impl Command {
         image.clear_image(value);
     }
 
-    pub fn draw_mesh(&mut self, render_target: &mut RenderTarget, mut depth_buffer: Option<&mut DepthBuffer>, aspect_ratio: f32, mesh_data: MeshData) {
-        for vertex_index in (0..mesh_data.mesh.indices.len() - 2).step_by(3) {
-            let mut i0 = vertex_index as u32;
-            let mut i1 = vertex_index as u32 + 1;
-            let mut i2 = vertex_index as u32 + 2;
+    pub fn draw_mesh<VertexInput, VertexOutput , FragmentInput>(&mut self, render_target: &mut RenderTarget, mut depth_buffer: Option<&mut DepthBuffer>, shader: &Shader<VertexInput, VertexOutput, FragmentInput>, vertex_input: &VertexInput, fragment_input: &FragmentInput)
+    where VertexOutput: Interpolate, {
+        for vertex_index in (0..self.indices.unwrap().len() - 2).step_by(3) {
 
-            if !mesh_data.mesh.indices.is_empty() {
-                i0 = mesh_data.mesh.indices[i0 as usize];
-                i1 = mesh_data.mesh.indices[i1 as usize];
-                i2 = mesh_data.mesh.indices[i2 as usize];
-            }
+            let (mut vertex_output, positions) = (shader.vertex_shader)(vertex_index as u32, &vertex_input);
 
-            let perspective = Matrix4::perspective(
-                0.01,
-                100.0,
-                std::f32::consts::PI / 3.0,
-                aspect_ratio,
-            );
-
-            let mut vertices = [Vertex { position: Float4::zero(), color: Float4::zero(), uv: Float2::zero() }; 3];
-            vertices[0].position = perspective * mesh_data.transform * mesh_data.mesh.positions[i0 as usize].as_point();
-            vertices[1].position = perspective * mesh_data.transform * mesh_data.mesh.positions[i1 as usize].as_point();
-            vertices[2].position = perspective * mesh_data.transform * mesh_data.mesh.positions[i2 as usize].as_point();
-            vertices[0].uv = mesh_data.mesh.uvs[i0 as usize];
-            vertices[1].uv = mesh_data.mesh.uvs[i1 as usize];
-            vertices[2].uv = mesh_data.mesh.uvs[i2 as usize];
-
-            let (clipped_vertices, count) = clip_vertices(vertices);
+            let (clipped_vertices, count) = clip_vertices(positions);
 
             for triangle in clipped_vertices[..count as usize].chunks_exact(3)  {
-                let mut v0 = triangle[0].position;
-                let mut v1 = triangle[1].position;
-                let mut v2 = triangle[2].position;
-
-                let uv0 = triangle[0].uv;
-                let mut uv1 = triangle[1].uv;
-                let mut uv2 = triangle[2].uv;
+                let mut v0 = triangle[0];
+                let mut v1 = triangle[1];
+                let mut v2 = triangle[2];
 
                 v0 = math::perspective_divide(v0);
                 v1 = math::perspective_divide(v1);
@@ -127,7 +99,7 @@ impl Command {
                     CullMode::None => {
                         if ccw {
                             std::mem::swap(&mut v1, &mut v2);
-                            std::mem::swap(&mut uv1, &mut uv2);
+                            vertex_output.swap(2, 1);
                             det012 = -det012;
                         }
                     }
@@ -136,7 +108,7 @@ impl Command {
                             continue;
                         }
                         std::mem::swap(&mut v1, &mut v2);
-                        std::mem::swap(&mut uv1, &mut uv2);
+                        vertex_output.swap(2, 1);
                         det012 = -det012;
                     }
                     CullMode::CounterClockwise => {
@@ -183,10 +155,6 @@ impl Command {
                             l1 /= l_sum;
                             l2 /= l_sum;
 
-                            let tex_coords = l0 * uv0 + l1 * uv1 + l2 * uv2;
-
-                            let color = mesh_data.texture.pixel_at_uv(tex_coords);
-
                             if let Some(depth_buffer) = depth_buffer.as_mut() {
                                 let old_depth = depth_buffer.get_pixel(x as u32, y as u32);
 
@@ -201,6 +169,12 @@ impl Command {
                                     continue;
                                 }
                             }
+
+                            let interpolated_output = VertexOutput::interp(l0, l1, l2, &vertex_output[0], &vertex_output[1], &vertex_output[2]);
+
+
+                            let color = (shader.fragment_shader)(&interpolated_output, &fragment_input);
+
                             render_target.set_pixel(x as u32, y as u32, color);
                         }
                     }
@@ -211,20 +185,16 @@ impl Command {
     }
 }
 
-fn clip_intersect_edge(v0: Vertex, v1: Vertex, val0: f32, val1: f32) -> Vertex {
+fn clip_intersect_edge(v0: Float4, v1: Float4, val0: f32, val1: f32) -> Float4 {
     let t = val0 / (val0 - val1);
-    Vertex{
-        position: (1.0 - t) * v0.position + t * v1.position,
-        color: (1.0 - t) * v0.color + t * v1.color,
-        uv: (1.0 - t) * v0.uv + t * v1.uv,
-    }
+    (1.0 - t) * v0 + t * v1
 }
 
-fn clip_triangle_against_plane(vertices: &[Vertex], equation: Float4, clipped: &mut [Vertex; 12], count: &mut u32) {
+fn clip_triangle_against_plane(vertices: &[Float4], equation: Float4, clipped: &mut [Float4; 12], count: &mut u32) {
     let values = [
-        vertices[0].position.dot(equation),
-        vertices[1].position.dot(equation),
-        vertices[2].position.dot(equation),
+        vertices[0].dot(equation),
+        vertices[1].dot(equation),
+        vertices[2].dot(equation),
     ];
 
     let mask: u8 =
@@ -326,8 +296,8 @@ fn clip_triangle_against_plane(vertices: &[Vertex], equation: Float4, clipped: &
     }
 }
 
-fn clip_vertices(vertices: [Vertex; 3]) -> ([Vertex; 12], u32) {
-    let mut input: [Vertex; 12] = [Vertex::default(); 12];
+fn clip_vertices(vertices: [Float4; 3]) -> ([Float4; 12], u32) {
+    let mut input: [Float4; 12] = [Float4::default(); 12];
     input[0..3].copy_from_slice(&vertices);
     let mut count = 3u32;
     let equations: [Float4; 2] = [
@@ -336,7 +306,7 @@ fn clip_vertices(vertices: [Vertex; 3]) -> ([Vertex; 12], u32) {
     ];
 
     for equation in equations.into_iter() {
-        let mut output: [Vertex; 12] = [Vertex::default(); 12];
+        let mut output: [Float4; 12] = [Float4::default(); 12];
         for triangle in input[0..count as usize].chunks_exact(3) {
             clip_triangle_against_plane(triangle, equation, &mut output, &mut count);
         }

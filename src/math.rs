@@ -4,6 +4,10 @@ use std::ops::{AddAssign, Mul};
 
 pub trait Number: Copy + Zero + One {}
 
+pub trait Interpolate: Sized {
+    fn interp(l0: f32, l1: f32, l2: f32, a: &Self, b: &Self, c: &Self) -> Self;
+}
+
 impl Number for f32 {}
 impl Number for f64 {}
 impl Number for i32 {}
@@ -33,6 +37,14 @@ impl<T: Number> Vec2<T> {
 pub type UInt2 = Vec2<u32>;
 pub type Int2 = Vec2<i32>;
 pub type Float2 = Vec2<f32>;
+
+impl Interpolate for Float2
+{
+    fn interp(l0: f32, l1: f32, l2: f32, a: &Self, b: &Self, c: &Self) -> Self
+    {
+        l0 * *a + l1 * *b + l2 * *c
+    }
+}
 
 impl Mul<Float2> for f32 {
     type Output = Float2;
@@ -137,6 +149,23 @@ impl Float3
     }
 }
 
+impl Mul<Float3> for f32 {
+    type Output = Float3;
+
+    fn mul(self, rhs: Float3) -> Self::Output {
+        Float3::new(self * rhs.x, self * rhs.y, self * rhs.z)
+    }
+}
+
+impl Interpolate for Float3
+{
+    fn interp(l0: f32, l1: f32, l2: f32, a: &Self, b: &Self, c: &Self) -> Self
+    {
+        l0 * *a + l1 * *b + l2 * *c
+    }
+}
+
+
 impl<T: Number + ops::Add<Output = T>> ops::Add<Vec3<T>> for Vec3<T> {
     type Output = Vec3<T>;
     fn add(self, _rhs: Vec3<T>) -> Vec3<T> {
@@ -206,6 +235,14 @@ impl Float4
 {
     pub fn det2d(self, v1: Float4) -> f32 {
         self.x * v1.y - self.y * v1.x
+    }
+}
+
+impl Interpolate for Float4
+{
+    fn interp(l0: f32, l1: f32, l2: f32, a: &Self, b: &Self, c: &Self) -> Self
+    {
+        *a * l0 + *b * l1 + *c * l2
     }
 }
 

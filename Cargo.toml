@@ -10,3 +10,5 @@ features = ["static-link", "build-from-source"]
 version = "0.2.19"
 [dependencies.stb_image]
 version = "0.3.0"
+[dependencies.interpolate_macro]
+path = "crates/interpolate_macro"
