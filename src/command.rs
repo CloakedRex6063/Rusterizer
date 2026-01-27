@@ -1,7 +1,22 @@
 use crate::image_view::{DepthBuffer, DepthTest, RenderTarget};
+use crate::math;
 use crate::math::{Color, Float3, Float4, Interpolate};
 use crate::viewport::Viewport;
-use crate::{CullMode, math};
+use num_traits::float::FloatCore;
+use num_traits::real::Real;
+
+#[derive(Eq, PartialEq)]
+pub enum CullMode {
+    None,
+    Clockwise,
+    CounterClockwise,
+}
+
+#[derive(Eq, PartialEq)]
+pub enum FillMode {
+    Solid,
+    Wireframe,
+}
 
 struct DepthState {
     write: bool,
@@ -10,10 +25,13 @@ struct DepthState {
 
 pub struct Command<'a> {
     cull_mode: CullMode,
+    fill_mode: FillMode,
     viewport: Viewport,
     depth_state: DepthState,
+    line_width: f32,
     positions: Option<&'a [Float3]>,
     indices: Option<&'a [u32]>,
+    line_color: Color,
 }
 
 pub struct Shader<VertexInput, VertexOutput, FragmentInput> {
@@ -25,6 +43,7 @@ impl<'a> Command<'a> {
     pub fn new() -> Self {
         Self {
             cull_mode: CullMode::None,
+            fill_mode: FillMode::Solid,
             viewport: Viewport {
                 x_min: 0,
                 y_min: 0,
@@ -35,8 +54,10 @@ impl<'a> Command<'a> {
                 write: false,
                 test: DepthTest::Less,
             },
+            line_width: 1.0,
             positions: None,
             indices: None,
+            line_color: Color::new(255, 255, 255),
         }
     }
 
@@ -50,6 +71,14 @@ impl<'a> Command<'a> {
 
     pub fn set_cull_mode(&mut self, cull_mode: CullMode) {
         self.cull_mode = cull_mode;
+    }
+
+    pub fn set_line_width(&mut self, line_width: f32) {
+        self.line_width = line_width;
+    }
+
+    pub fn set_fill_mode(&mut self, fill_mode: FillMode) {
+        self.fill_mode = fill_mode;
     }
 
     pub fn set_viewport(&mut self, viewport: Viewport) {
@@ -211,7 +240,7 @@ impl<'a> Command<'a> {
                     let det12p = (v2 - v1).det2d(p - v1);
                     let det20p = (v0 - v2).det2d(p - v2);
 
-                    if det01p >= 0.0 && det12p >= 0.0 && det20p >= 0.0 {
+                    if det01p > 0.0 && det12p > 0.0 && det20p > 0.0 {
                         let mut l0 = (v1 - p).det2d(v2 - p) / det012 / v0.w;
                         let mut l1 = (v2 - p).det2d(v0 - p) / det012 / v1.w;
                         let mut l2 = (v0 - p).det2d(v1 - p) / det012 / v2.w;
@@ -234,21 +263,78 @@ impl<'a> Command<'a> {
                             continue;
                         }
 
-                        let interpolated_output = VertexOutput::interp(
-                            l0,
-                            l1,
-                            l2,
-                            &vertex_output0,
-                            &vertex_output1,
-                            &vertex_output2,
-                        );
-
-                        let color = (shader.fragment_shader)(&interpolated_output, &fragment_input);
-
-                        render_target.set_pixel(x as u32, y as u32, color);
+                        match self.fill_mode {
+                            FillMode::Solid => self.fill_triangle(
+                                render_target,
+                                &shader.fragment_shader,
+                                fragment_input,
+                                (l0, l1, l2),
+                                (&vertex_output0, &vertex_output1, &vertex_output2),
+                                (x as u32, y as u32)
+                            ),
+                            FillMode::Wireframe => self.wireframe_triangle(
+                                render_target,
+                                (det01p, det12p, det20p),
+                                (v0, v1, v2),
+                                (x as u32, y as u32)
+                            ),
+                        };
                     }
                 }
             }
+        }
+    }
+
+    fn fill_triangle<VertexOutput, FragmentInput>(
+        &mut self,
+        render_target: &mut RenderTarget,
+        fragment_shader: &Box<dyn Fn(&VertexOutput, &FragmentInput) -> Color>,
+        fragment_input: &FragmentInput,
+        triangle_areas: (f32, f32, f32),
+        vertex_output: (&VertexOutput, &VertexOutput, &VertexOutput),
+        screen_coords: (u32, u32)
+    )
+    where
+        VertexOutput: Interpolate,
+    {
+        let (l0, l1, l2) = triangle_areas;
+        let (vertex_output0, vertex_output1, vertex_output2) = vertex_output;
+        let interpolated_output = VertexOutput::interp(
+            l0,
+            l1,
+            l2,
+            &vertex_output0,
+            &vertex_output1,
+            &vertex_output2,
+        );
+        let color = fragment_shader(&interpolated_output, &fragment_input);
+        render_target.set_pixel(screen_coords.0, screen_coords.1, color);
+    }
+
+    fn wireframe_triangle(
+        &mut self,
+        render_target: &mut RenderTarget,
+        determinants: (f32, f32, f32),
+        clipped_vertices: (Float4, Float4, Float4),
+        screen_coords: (u32, u32)
+    ) {
+        let (v0, v1, v2) = clipped_vertices;
+        let (det01p, det12p, det20p) = determinants;
+        let v0_f3 = Float3::new(v0.x, v0.y, v0.z);
+        let v1_f3 = Float3::new(v1.x, v1.y, v1.z);
+        let v2_f3 = Float3::new(v2.x, v2.y, v2.z);
+
+        let e0_length = (v1_f3 - v0_f3).length();
+        let e1_length = (v2_f3 - v1_f3).length();
+        let e2_length = (v0_f3 - v2_f3).length();
+
+        let e0_normalized = det01p / e0_length;
+        let e1_normalized = det12p / e1_length;
+        let e2_normalized = det20p / e2_length;
+
+        let min = e0_normalized.min(e1_normalized).min(e2_normalized);
+        if min < self.line_width {
+            render_target.set_pixel(screen_coords.0, screen_coords.1, self.line_color);
         }
     }
 }

@@ -140,12 +140,22 @@ pub type Float3 = Vec3<f32>;
 impl Float3
 {
     pub fn normalize(self) -> Self {
-        let len = ((self.x * self.x + self.y * self.y + self.z * self.z)).sqrt();
+        let len = self.length();
         Self {
             x: self.x / len,
             y: self.y / len,
             z: self.z / len,
         }
+    }
+
+    pub fn length_squared(&self) -> f32
+    {
+        self.x * self.x + self.y * self.y + self.z * self.z
+    }
+
+    pub fn length(self) -> f32
+    {
+        self.length_squared().sqrt()
     }
 }
 

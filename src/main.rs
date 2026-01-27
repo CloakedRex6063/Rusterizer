@@ -1,4 +1,4 @@
-use crate::command::{Command, Shader};
+use crate::command::{Command, CullMode, FillMode, Shader};
 use crate::image_view::{DepthBuffer, DepthTest, RenderTarget, Texture};
 use crate::math::Interpolate;
 use crate::math::{Float2, Float3, Float4, Matrix4};
@@ -6,7 +6,6 @@ use crate::meshes::{Cube, Mesh};
 use crate::viewport::Viewport;
 use crate::window::Window;
 use interpolate_macro::Interpolate;
-use std::cmp::PartialEq;
 use std::path::Path;
 use std::time::Instant;
 
@@ -17,13 +16,6 @@ mod math;
 mod meshes;
 mod viewport;
 mod window;
-
-#[derive(Eq, PartialEq)]
-enum CullMode {
-    None,
-    Clockwise,
-    CounterClockwise,
-}
 
 #[macro_export]
 macro_rules! profile {
@@ -110,12 +102,14 @@ fn main() {
         command.set_viewport(viewport);
 
         command.set_cull_mode(CullMode::Clockwise);
+        command.set_fill_mode(FillMode::Wireframe);
 
+        command.set_line_width(2.0);
         command.set_depth_test(DepthTest::Less);
         command.toggle_depth_write(true);
 
         profile!("Clear Time", {
-            command.clear_render_target(&mut render_target, Float4::new(1.0, 1.0, 1.0, 1.0));
+            command.clear_render_target(&mut render_target, Float4::new(0.0, 0.0, 0.0, 1.0));
             command.clear_depth_buffer(&mut depth_buffer, 1.0);
         });
 
@@ -127,7 +121,7 @@ fn main() {
         profile!("Mesh Render Time", {
             command.set_positions(&cube.mesh.positions);
             command.set_indices(&cube.mesh.indices);
-            let model = Matrix4::translate(Float3::new(0.0, 1.0, -5.0))
+            let model = Matrix4::translate(Float3::new(-2.0, 0.0, -5.0))
                 * Matrix4::rotate_yz(time)
                 * Matrix4::rotate_xy(time);
 
@@ -137,6 +131,27 @@ fn main() {
                 perspective,
                 texture: &texture,
             };
+
+            command.draw_indexed(
+                &mut render_target,
+                &mut depth_buffer,
+                &shader,
+                &mesh_data,
+                &mesh_data,
+            );
+
+            let model = Matrix4::translate(Float3::new(2.0, 0.0, -5.0))
+                * Matrix4::rotate_yz(time)
+                * Matrix4::rotate_xy(time);
+
+            let mesh_data = MeshData {
+                mesh: &cube.mesh,
+                model,
+                perspective,
+                texture: &texture,
+            };
+
+            command.set_fill_mode(FillMode::Solid);
 
             command.draw_indexed(
                 &mut render_target,

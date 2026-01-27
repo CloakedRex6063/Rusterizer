@@ -70,7 +70,7 @@ impl Texture {
     pub fn pixel_at_uv(&self, uv: Float2) -> Color
     {
         let mut x = (uv.x * self.width as f32) as usize;
-        let mut y = (uv.y * self.height as f32) as usize;
+        let mut y = ((1.0 - uv.y) * self.height as f32) as usize;
         x = x.clamp(0, self.width as usize - 1);
         y = y.clamp(0, self.height as usize - 1);
         let id = y * self.width as usize + x;
