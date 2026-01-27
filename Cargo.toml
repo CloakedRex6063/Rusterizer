@@ -12,3 +12,5 @@ version = "0.2.19"
 version = "0.3.0"
 [dependencies.interpolate_macro]
 path = "crates/interpolate_macro"
+[dependencies.gltf]
+version = "1.4.1"

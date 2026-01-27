@@ -2,14 +2,12 @@ use crate::image_view::{DepthBuffer, DepthTest, RenderTarget};
 use crate::math;
 use crate::math::{Color, Float3, Float4, Interpolate};
 use crate::viewport::Viewport;
-use num_traits::float::FloatCore;
-use num_traits::real::Real;
 
 #[derive(Eq, PartialEq)]
 pub enum CullMode {
     None,
-    Clockwise,
-    CounterClockwise,
+    BackFace,
+    FrontFace,
 }
 
 #[derive(Eq, PartialEq)]
@@ -57,7 +55,7 @@ impl<'a> Command<'a> {
             line_width: 1.0,
             positions: None,
             indices: None,
-            line_color: Color::new(255, 255, 255),
+            line_color: Color::new(255, 255, 255, 255),
         }
     }
 
@@ -200,7 +198,7 @@ impl<'a> Command<'a> {
                         det012 = -det012;
                     }
                 }
-                CullMode::Clockwise => {
+                CullMode::BackFace => {
                     if !ccw {
                         continue;
                     }
@@ -208,7 +206,7 @@ impl<'a> Command<'a> {
                     std::mem::swap(&mut vertex_output1, &mut vertex_output2);
                     det012 = -det012;
                 }
-                CullMode::CounterClockwise => {
+                CullMode::FrontFace => {
                     if ccw {
                         continue;
                     }

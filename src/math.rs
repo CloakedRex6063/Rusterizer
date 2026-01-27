@@ -1,6 +1,6 @@
 use num_traits::{One, Zero};
 use std::ops;
-use std::ops::{AddAssign, Mul};
+use std::ops::{Add, AddAssign, Mul};
 
 pub trait Number: Copy + Zero + One {}
 
@@ -108,6 +108,10 @@ impl<T: Number> Vec3<T> {
 
     pub fn zero() -> Self {
         Self::new(T::zero(), T::zero(), T::zero())
+    }
+
+    pub fn one() -> Self {
+        Self::new(T::one(), T::zero(), T::zero())
     }
 
     pub fn dot(self, _rhs: Vec3<T>) -> T {
@@ -337,8 +341,8 @@ impl AddAssign<Float3> for Color {
 
 impl Color
 {
-    pub fn new(r: u8, g: u8, b: u8) -> Self {
-        Self { color: [r, g, b, 255] }
+    pub fn new(r: u8, g: u8, b: u8, a: u8) -> Self {
+        Self { color: [r, g, b, a] }
     }
 }
 
@@ -362,6 +366,21 @@ impl From<Color> for Float4 {
             y: c.color[1] as f32 / 255.0,
             z: c.color[2] as f32 / 255.0,
             w: c.color[3] as f32 / 255.0,
+        }
+    }
+}
+
+impl Add for Color {
+    type Output = Color;
+
+    fn add(self, other: Self) -> Self {
+        Self {
+            color: [
+                self.color[0].saturating_add(other.color[0]),
+                self.color[1].saturating_add(other.color[1]),
+                self.color[2].saturating_add(other.color[2]),
+                self.color[3].saturating_add(other.color[3]),
+            ],
         }
     }
 }

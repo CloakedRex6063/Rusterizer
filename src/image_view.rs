@@ -57,6 +57,7 @@ impl Texture {
                             image.data[index],
                             image.data[index + 1],
                             image.data[index + 2],
+                            255
                         ),
                     );
                 }
@@ -69,10 +70,10 @@ impl Texture {
 
     pub fn pixel_at_uv(&self, uv: Float2) -> Color
     {
-        let mut x = (uv.x * self.width as f32) as usize;
-        let mut y = ((1.0 - uv.y) * self.height as f32) as usize;
-        x = x.clamp(0, self.width as usize - 1);
-        y = y.clamp(0, self.height as usize - 1);
+        let u = uv.x.rem_euclid(1.0);
+        let v = uv.y.rem_euclid(1.0);
+        let x = (u * self.width as f32) as usize % self.width as usize;
+        let y = (v * self.height as f32) as usize % self.height as usize;
         let id = y * self.width as usize + x;
         self.pixels[id]
     }
