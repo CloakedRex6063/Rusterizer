@@ -1,5 +1,6 @@
 use crate::command::{Command, CullMode, FillMode, Shader};
 use crate::image_view::{DepthBuffer, DepthTest, RenderTarget, Texture};
+use crate::light::{DirectionalLight, PointLight};
 use crate::math::{Color, Interpolate};
 use crate::math::{Float2, Float3, Float4, Matrix4};
 use crate::meshes::{Cube, Mesh, Model};
@@ -47,6 +48,8 @@ fn main() {
         pub model: Matrix4,
         pub perspective: Matrix4,
         pub textures: &'a [Texture],
+        pub point_lights: &'a [PointLight],
+        pub dir_lights: &'a [DirectionalLight],
     }
 
     #[derive(Default, Debug, Clone, Copy, Interpolate)]
@@ -55,6 +58,28 @@ fn main() {
         pub world_pos: Float4,
         pub uv: Float2,
     }
+
+    let point_lights: Vec<PointLight> = vec![
+        PointLight {
+            pos: Float3::new(-2.0, 0.0, 2.0),
+            intensity: 1.0,
+            color: Float3::new(0.2, 0.3, 0.3),
+            range: 100.0,
+        },
+        PointLight {
+            pos: Float3::new(2.0, 0.0, 2.0),
+            intensity: 1.0,
+            color: Float3::new(0.7, 0.5, 0.4),
+            range: 100.0,
+        },
+    ];
+
+    let dir_lights: Vec<DirectionalLight> = vec![DirectionalLight {
+        direction: Float3::new(-1.0, -1.0, -1.0),
+        intensity: 1.0,
+        color: Float3::new(1.0, 1.0, 1.0),
+        cast_shadow: false,
+    }];
 
     let shader = Shader {
         vertex_shader: Box::new(
@@ -88,7 +113,17 @@ fn main() {
                 .map(|tex| tex.pixel_at_uv(vertex.uv))
                 .unwrap_or_else(|| Color::from(Float4::new(0.0, 0.0, 0.0, 1.0)));
 
-            albedo + emissive
+            let mut l0 = Float3::zero();
+            for point_light in fragment_input.point_lights {
+                let distance = (point_light.pos
+                    - Float3::new(vertex.world_pos.x, vertex.world_pos.y, vertex.world_pos.z))
+                .length();
+                let attenuation = 1.0 / (distance * distance);
+                let radiance = point_light.intensity * attenuation * point_light.color;
+                l0 = l0 + radiance;
+            }
+
+            albedo + emissive + Color::from(Float4::new(l0.x, l0.y, l0.z, 1.0))
         }),
     };
 
@@ -100,6 +135,7 @@ fn main() {
         let dt = last_time.elapsed().as_secs_f32();
         last_time = Instant::now();
         time += dt;
+        println!("FPS: {}", 1.0 / dt);
 
         let (width, height) = window.get_window_size();
         if window.is_resized() {
@@ -145,6 +181,8 @@ fn main() {
                 model,
                 perspective: view_proj,
                 textures: std::slice::from_ref(&texture),
+                point_lights: &point_lights,
+                dir_lights: &dir_lights,
             };
 
             command.draw_indexed(
@@ -165,6 +203,8 @@ fn main() {
                     model,
                     perspective: view_proj,
                     textures: &helmet.textures,
+                    point_lights: &point_lights,
+                    dir_lights: &dir_lights,
                 };
 
                 command.set_fill_mode(FillMode::Solid);
