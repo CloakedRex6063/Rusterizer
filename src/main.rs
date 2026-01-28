@@ -1,4 +1,3 @@
-use std::ops::Add;
 use crate::command::{Command, CullMode, FillMode, Shader};
 use crate::image_view::{DepthBuffer, DepthTest, RenderTarget, Texture};
 use crate::math::{Color, Interpolate};
@@ -127,20 +126,24 @@ fn main() {
 
         let aspect_ratio = width as f32 / height as f32;
 
+        let view_matrix = Matrix4::translate(Float3::new(0.0, 0.0, -10.0));
+
         let perspective =
             Matrix4::perspective(0.01, 100.0, std::f32::consts::PI / 3.0, aspect_ratio);
 
         profile!("Mesh Render Time", {
             command.set_positions(&cube.mesh.positions);
             command.set_indices(&cube.mesh.indices);
-            let model = Matrix4::translate(Float3::new(-2.0, 0.0, -5.0))
+            let model = Matrix4::translate(Float3::new(-2.0, 0.0, 0.0))
                 * Matrix4::rotate_yz(time)
                 * Matrix4::rotate_xy(time);
+
+            let view_proj = perspective * view_matrix;
 
             let mesh_data = MeshData {
                 mesh: &cube.mesh,
                 model,
-                perspective,
+                perspective: view_proj,
                 textures: std::slice::from_ref(&texture),
             };
 
@@ -152,7 +155,7 @@ fn main() {
                 &mesh_data,
             );
 
-            let model = Matrix4::translate(Float3::new(2.0, 0.0, -5.0))
+            let model = Matrix4::translate(Float3::new(2.0, 0.0, 0.0))
                 * Matrix4::rotate_yz(time)
                 * Matrix4::rotate_xy(time);
 
@@ -160,7 +163,7 @@ fn main() {
                 let mesh_data = MeshData {
                     mesh: &mesh,
                     model,
-                    perspective,
+                    perspective: view_proj,
                     textures: &helmet.textures,
                 };
 

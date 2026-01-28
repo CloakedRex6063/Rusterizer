@@ -458,15 +458,17 @@ fn clip_vertices(vertices: [Float4; 3]) -> ([Float4; 12], u32) {
         Float4::new(0.0, 0.0, -1.0, 1.0),
     ];
 
+    let mut clip_count = 0;
     for equation in equations.into_iter() {
         let mut output: [Float4; 12] = [Float4::default(); 12];
         for triangle in input[0..count as usize].chunks_exact(3) {
-            clip_triangle_against_plane(triangle, equation, &mut output, &mut count);
+            clip_triangle_against_plane(triangle, equation, &mut output, &mut clip_count);
         }
+        count = clip_count;
         input = output;
     }
 
-    (input, count)
+    (input, clip_count)
 }
 
 const fn passed_depth_test(depth_test: DepthTest, value: f32, reference: f32) -> bool {
